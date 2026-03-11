@@ -54,33 +54,36 @@ Next.js API Routes  ────────  Core Services (shared)
         ├── PromptBuilder        → constructs system + user prompts per feature
         ├── AIClient             → Vercel AI SDK (model-agnostic)
         │         └── OpenAI / Anthropic / Grok
-        ├── MCPClient            → @modelcontextprotocol/sdk
-        │         └── Notion MCP Server → Notion API → Notion Workspace
-        └── NotionClient         → @notionhq/client (direct API for non-MCP calls)
+        ├── MCPClient            → @modelcontextprotocol/sdk (SSE transport)
+        │         └── Notion's hosted MCP Server (api.notion.com/mcp)
+        │                   └── Notion API → Notion Workspace
+        └── NotionClient         → @notionhq/client (direct API for non-AI reads)
 ```
 
-### Key principle
-All core logic (PromptBuilders, MCPClient, NotionClient) lives in `lib/` and is shared
-between the web UI (Next.js API routes) and the CLI. The CLI calls the same services
-directly in Node.js; the web UI calls them via HTTP API routes.
+### Key principles
+- All core logic (PromptBuilders, MCPClient, NotionClient) lives in `lib/` and is shared
+  between the web UI (Next.js API routes) and the CLI.
+- **AI-driven actions** (merge, archive, ask) go through the real Notion MCP server.
+- **Read operations** for UI (fetching pages for dashboard, graph) use NotionClient directly.
 
 ---
 
 ## 5. User Authentication & Keys
 
-Users provide two keys — once for the web UI, once for the CLI:
+### Notion — OAuth (Web UI)
+- User clicks "Connect Notion" → redirected to Notion's OAuth page → clicks Allow
+- Notion redirects back with an OAuth access token
+- Token stored in localStorage, sent as header on API requests
+- No manual token copying required
 
-1. **Notion Integration Token** — created at notion.so/my-integrations (takes ~2 min)
-2. **AI API Key** — OpenAI / Anthropic / Grok depending on chosen provider
+### Notion — Token (CLI)
+- User runs `noterunway init` → prompted for Notion integration token
+- Token stored in local `.env` file (never committed)
 
-### Web UI
-- Keys stored in browser localStorage only
-- Sent to Next.js API routes per-request via headers
-- Server never stores or logs keys
-
-### CLI
-- Keys provided via environment variables or a local `.env` file (never committed)
-- `NOTION_TOKEN=xxx OPENAI_API_KEY=xxx noterunway doctor --duplicates`
+### AI API Key — BYOK (both)
+- User provides their own OpenAI / Anthropic / Grok key
+- Web UI: stored in localStorage
+- CLI: stored in `.env` file
 
 ### Onboarding flow (Web)
 ```
