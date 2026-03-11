@@ -65,31 +65,40 @@ export class NotionClient {
     }
   }
 
-  // Fetch the content blocks of a page
-  async getPageBlocks(pageId: string): Promise<BlockObjectResponse[]> {
-    const blocks: BlockObjectResponse[] = []
+  // Recursively fetches all blocks including nested children
+  private async fetchBlockChildrenRecursively(
+    blockId: string,
+    blocks: BlockObjectResponse[]
+  ): Promise<void> {
     let cursor: string | undefined = undefined
-
-    try {
-      do {
-        const response = await this.client.blocks.children.list({
-          block_id: pageId,
-          start_cursor: cursor,
-          page_size: 100,
-        })
-
-        for (const block of response.results) {
-          if ('type' in block) {
-            blocks.push(block as BlockObjectResponse)
+    do {
+      const response = await this.client.blocks.children.list({
+        block_id: blockId,
+        start_cursor: cursor,
+        page_size: 100,
+      })
+      for (const block of response.results) {
+        if ('type' in block) {
+          const fullBlock = block as BlockObjectResponse
+          blocks.push(fullBlock)
+          if (fullBlock.has_children) {
+            await this.fetchBlockChildrenRecursively(fullBlock.id, blocks)
           }
         }
+      }
+      cursor = response.has_more ? (response.next_cursor ?? undefined) : undefined
+    } while (cursor)
+  }
 
-        cursor = response.has_more ? (response.next_cursor ?? undefined) : undefined
-      } while (cursor)
+  // Fetch all content blocks of a page, including nested children
+  async getPageBlocks(pageId: string): Promise<BlockObjectResponse[]> {
+    const blocks: BlockObjectResponse[] = []
+    try {
+      await this.fetchBlockChildrenRecursively(pageId, blocks)
     } catch (err: unknown) {
       throw this.handleError(err)
     }
-
+    
     return blocks
   }
 
