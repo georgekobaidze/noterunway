@@ -135,8 +135,12 @@ export class NotionClient {
     try {
       await this.client.users.me({})
       return true
-    } catch {
-      return false
+    } catch (err: unknown) {
+      const normalizedError = this.handleError(err)
+      if (normalizedError.code === 'unauthorized') {
+        return false
+      }
+      throw normalizedError
     }
   }
 
