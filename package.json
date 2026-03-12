@@ -8,6 +8,9 @@
     "start": "next start",
     "lint": "eslint"
   },
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",
     "@ai-sdk/openai": "^3.0.41",
