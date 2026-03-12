@@ -54,8 +54,8 @@ Next.js API Routes  ────────  Core Services (shared)
         ├── PromptBuilder        → constructs system + user prompts per feature
         ├── AIClient             → Vercel AI SDK (model-agnostic)
         │         └── OpenAI / Anthropic / Grok
-        ├── MCPClient            → @modelcontextprotocol/sdk (SSE transport)
-        │         └── Notion's hosted MCP Server (api.notion.com/mcp)
+        ├── MCPClient            → @modelcontextprotocol/sdk (Streamable HTTP with SSE fallback)
+        │         └── Notion's hosted MCP server (https://mcp.notion.com)
         │                   └── Notion API → Notion Workspace
         └── NotionClient         → @notionhq/client (direct API for non-AI reads)
 ```
