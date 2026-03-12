@@ -51,13 +51,27 @@ export class MCPClient {
         { requestInit: { headers } }
       )
       await this.client.connect(transport)
-    } catch {
-      // Streamable HTTP failed — fall back to SSE
-      const transport = new SSEClientTransport(
-        new URL(`${NOTION_MCP_URL}/sse`),
-        { requestInit: { headers } }
-      )
-      await this.client.connect(transport)
+    } catch (firstError) {
+      // Streamable HTTP failed — attempt SSE fallback
+      try {
+        const transport = new SSEClientTransport(
+          new URL(`${NOTION_MCP_URL}/sse`),
+          { requestInit: { headers } }
+        )
+        await this.client.connect(transport)
+      } catch (secondError) {
+        const firstMessage =
+          firstError instanceof Error ? firstError.message : String(firstError)
+        const secondMessage =
+          secondError instanceof Error ? secondError.message : String(secondError)
+        const error = new MCPError(
+          `Failed to connect to MCP server. ` +
+            `Streamable HTTP error: ${firstMessage}. ` +
+            `SSE fallback error: ${secondMessage}`
+        )
+        ;(error as any).cause = firstError
+        throw error
+      }
     }
 
     this.connected = true
