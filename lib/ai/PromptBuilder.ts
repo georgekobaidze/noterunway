@@ -42,8 +42,20 @@ export abstract class PromptBuilder<TContext = unknown> {
       const parsed = JSON.parse(cleaned)
 
       if (
-        typeof parsed.reasoning === 'string' &&
-        Array.isArray(parsed.actions)
+        parsed &&
+        typeof parsed === 'object' &&
+        typeof (parsed as { reasoning?: unknown }).reasoning === 'string' &&
+        Array.isArray((parsed as { actions?: unknown }).actions) &&
+        (parsed as { actions: unknown[] }).actions.every((action) => {
+          if (!action || typeof action !== 'object') return false
+          const a = action as { tool?: unknown; parameters?: unknown }
+          return (
+            typeof a.tool === 'string' &&
+            typeof a.parameters === 'object' &&
+            a.parameters !== null &&
+            !Array.isArray(a.parameters)
+          )
+        })
       ) {
         return parsed as AIActionPlan
       }
