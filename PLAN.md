@@ -64,17 +64,18 @@ Next.js API Routes  ────────  Core Services (shared)
 - All core logic (PromptBuilders, MCPClient, NotionClient) lives in `lib/` and is shared
   between the web UI (Next.js API routes) and the CLI.
 - **AI-driven actions** (merge, archive, ask) go through the real Notion MCP server.
-- **Read operations** for UI (fetching pages for dashboard, graph) use NotionClient directly.
+- **Non-AI operations** (fetching pages for dashboard, graph, token validation) use NotionClient directly.
+- NotionClient's write methods (archivePage, updatePageTitle) exist for utility/CLI use only — never called as a result of AI decisions.
 
 ---
 
 ## 5. User Authentication & Keys
 
 ### Notion — OAuth (Web UI)
-- User clicks "Connect Notion" → redirected to Notion's OAuth page → clicks Allow
-- Notion redirects back with an OAuth access token
-- Token stored in localStorage, sent as header on API requests
-- No manual token copying required
+- Handled by **NextAuth.js** — the OAuth flow runs entirely server-side
+- Token stored in an `httpOnly` secure cookie (never accessible to JavaScript)
+- User clicks "Connect Notion" → Notion OAuth page → clicks Allow → redirected back
+- No manual token copying, no XSS risk
 
 ### Notion — Token (CLI)
 - User runs `noterunway init` → prompted for Notion integration token
@@ -82,7 +83,7 @@ Next.js API Routes  ────────  Core Services (shared)
 
 ### AI API Key — BYOK (both)
 - User provides their own OpenAI / Anthropic / Grok key
-- Web UI: stored in localStorage
+- Web UI: stored in localStorage (user-owned key, acceptable risk for a demo tool)
 - CLI: stored in `.env` file
 
 ### Onboarding flow (Web)
