@@ -38,7 +38,7 @@ export abstract class PromptBuilder<TContext = unknown> {
   parseResponse(raw: string): AIActionPlan | null {
     try {
       // Strip markdown code fences if the model wraps its JSON in ```json ... ```
-      const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+      const cleaned = raw.replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim()
       const parsed = JSON.parse(cleaned)
 
       if (
