@@ -92,7 +92,7 @@ export class MCPClient {
     return tools.map((t) => t.name)
   }
 
-  // Execute a single tool call — destructive tools require approved: true
+  // Execute a single tool call — always returns MCPToolResult, never throws
   async executeTool(call: MCPToolCall): Promise<MCPToolResult> {
     this.ensureConnected()
 
@@ -101,9 +101,11 @@ export class MCPClient {
     )
 
     if (isDestructive && !call.approved) {
-      throw new MCPError(
-        `Tool "${call.tool}" modifies your workspace and requires user approval. Set approved: true to proceed.`
-      )
+      return {
+        tool: call.tool,
+        success: false,
+        error: `Tool "${call.tool}" modifies your workspace and requires user approval.`,
+      }
     }
 
     try {
