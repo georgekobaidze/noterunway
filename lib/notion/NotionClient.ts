@@ -98,7 +98,7 @@ export class NotionClient {
     } catch (err: unknown) {
       throw this.handleError(err)
     }
-    
+
     return blocks
   }
 
