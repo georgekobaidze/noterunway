@@ -3,8 +3,8 @@
 import { NetworkBackground } from '@/components/Landing/NetworkBackground'
 import { TerminalDemo } from '@/components/Landing/TerminalDemo'
 import { FeatureCard } from '@/components/Landing/FeatureCard'
+import { Navbar } from '@/components/Navbar'
 import { LayoutDashboard, GitMerge, Trash2, Network, Database, Sparkles } from 'lucide-react'
-import Image from 'next/image'
 import Link from 'next/link'
 
 const FEATURES = [
@@ -53,22 +53,11 @@ export default function Home() {
     <div className="relative min-h-screen overflow-x-hidden">
       <NetworkBackground />
 
-      {/* Nav */}
-      <nav className="relative z-10 flex items-center justify-between px-6 py-5 max-w-6xl mx-auto">
-        <div className="flex items-center gap-2">
-          <Image src="/images/logo.png" alt="NoteRunway" width={64} height={64} className="rounded" priority />
-          <span className="neon-text font-mono font-bold text-lg tracking-tight">NoteRunway</span>
-          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-[#00d4ff]/30 text-[#00d4ff]/70 tracking-widest">BETA</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href="/settings"
-            className="neon-btn text-sm px-8 py-3"
-          >
-            Connect Notion →
-          </Link>
-        </div>
-      </nav>
+      <Navbar rightSlot={
+        <Link href="/settings" className="neon-btn px-8 py-3 text-sm">
+          Connect Notion →
+        </Link>
+      } />
 
       {/* Hero */}
       <section className="relative z-10 flex flex-col items-center text-center px-6 pt-20 pb-16 max-w-4xl mx-auto">
