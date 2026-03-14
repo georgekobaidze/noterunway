@@ -54,7 +54,8 @@ export async function GET(req: NextRequest) {
     maxAge: 60 * 60 * 24 * 30, // 30 days
     path: '/',
   })
-  response.cookies.set('notion_workspace', JSON.stringify({ name: workspace_name, id: workspace_id }), {
+  const notionWorkspace = encodeURIComponent(JSON.stringify({ name: workspace_name, id: workspace_id }))
+  response.cookies.set('notion_workspace', notionWorkspace, {
     httpOnly: false, // readable by JS so UI can show workspace name
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
