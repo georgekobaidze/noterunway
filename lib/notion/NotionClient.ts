@@ -9,11 +9,9 @@ export type NotionPage = PageObjectResponse
 
 export interface WorkspaceStats {
   totalPages: number
-  orphanPages: number        // pages with no parent page (top-level or truly unlinked)
-  emptyPages: number         // pages with no content blocks
-  recentlyEditedPages: number // edited in last 7 days
-  linkDensity: number        // avg inbound links per page (0–1 score)
-  duplicateCandidates: number // pages with identical or near-identical titles
+  topLevelPages: number
+  recentlyEditedPages: number
+  duplicateCandidates: number
 }
 
 export class NotionError extends Error {
@@ -159,27 +157,8 @@ export class NotionClient {
     const now = Date.now()
     const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000
 
-    // Build a set of page IDs that appear as a parent of another page
-    const parentIds = new Set<string>()
-    for (const page of pages) {
-      if (page.parent.type === 'page_id') {
-        parentIds.add(page.parent.page_id)
-      }
-    }
+    const topLevelPages = pages.filter((p) => p.parent.type !== 'page_id').length
 
-    // Count inbound links per page (how many other pages reference this page as parent)
-    const inboundLinks = new Map<string, number>()
-    for (const page of pages) {
-      inboundLinks.set(page.id, 0)
-    }
-    for (const page of pages) {
-      if (page.parent.type === 'page_id') {
-        const count = inboundLinks.get(page.parent.page_id) ?? 0
-        inboundLinks.set(page.parent.page_id, count + 1)
-      }
-    }
-
-    const orphanPages = pages.filter((p) => (inboundLinks.get(p.id) ?? 0) === 0).length
     const recentlyEditedPages = pages.filter(
       (p) => new Date(p.last_edited_time).getTime() > sevenDaysAgo
     ).length
@@ -198,28 +177,85 @@ export class NotionClient {
     }
     const duplicateCandidates = [...titleCounts.values()].filter((c) => c > 1).length
 
-    // Link density: ratio of pages that have at least one inbound link
-    const linkedPages = pages.filter((p) => (inboundLinks.get(p.id) ?? 0) > 0).length
-    const linkDensity = pages.length > 0 ? linkedPages / pages.length : 0
-
-    // Empty pages: pages where the title is blank (we can't check blocks without N+1 calls)
-    const emptyPages = pages.filter((p) => {
-      const titleProp = p.properties['title'] ?? p.properties['Name']
-      const titleText =
-        titleProp?.type === 'title'
-          ? titleProp.title.map((t) => t.plain_text).join('').trim()
-          : ''
-      return titleText === ''
-    }).length
-
     return {
       totalPages: pages.length,
-      orphanPages,
-      emptyPages,
+      topLevelPages,
       recentlyEditedPages,
-      linkDensity: Math.round(linkDensity * 100) / 100,
       duplicateCandidates,
     }
+  }
+
+  // Compute true link density by scanning block content for page mentions.
+  // Returns the fraction of pages that are mentioned by at least one other page.
+  async getLinkDensity(): Promise<number> {
+    const pages = await this.getAllPages()
+    if (pages.length === 0) return 0
+
+    const pageIds = new Set(pages.map((p) => p.id))
+    const mentionedIds = new Set<string>()
+    const BATCH = 10
+
+    for (let i = 0; i < pages.length; i += BATCH) {
+      const batch = pages.slice(i, i + BATCH)
+      await Promise.all(
+        batch.map(async (page) => {
+          try {
+            let cursor: string | undefined = undefined
+            do {
+              const res = await this.client.blocks.children.list({
+                block_id: page.id,
+                start_cursor: cursor,
+                page_size: 100,
+              })
+              for (const block of res.results) {
+                if (!('type' in block)) continue
+                const b = block as BlockObjectResponse
+                // Extract rich text arrays from common block types
+                const richTexts = getRichTexts(b)
+                for (const rt of richTexts) {
+                  if (rt.type === 'mention' && rt.mention.type === 'page') {
+                    const id = rt.mention.page.id
+                    if (pageIds.has(id)) mentionedIds.add(id)
+                  }
+                }
+              }
+              cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined
+            } while (cursor)
+          } catch {
+            // skip inaccessible pages
+          }
+        })
+      )
+    }
+
+    return Math.round((mentionedIds.size / pages.length) * 100) / 100
+  }
+
+  // Count pages with no content blocks. Batches requests to avoid rate limits.
+  async getEmptyPageCount(): Promise<number> {
+    const pages = await this.getAllPages()
+    let emptyCount = 0
+    const BATCH = 10
+
+    for (let i = 0; i < pages.length; i += BATCH) {
+      const batch = pages.slice(i, i + BATCH)
+      const results = await Promise.all(
+        batch.map(async (page) => {
+          try {
+            const res = await this.client.blocks.children.list({
+              block_id: page.id,
+              page_size: 1,
+            })
+            return res.results.length === 0
+          } catch {
+            return false
+          }
+        })
+      )
+      emptyCount += results.filter(Boolean).length
+    }
+
+    return emptyCount
   }
 
   private handleError(err: unknown): NotionError {
@@ -245,4 +281,14 @@ export class NotionClient {
 
     return new NotionError('An unexpected error occurred')
   }
+}
+
+// Extracts all rich text arrays from a block (covers paragraph, headings, bullets, etc.)
+type RichTextItem = { type: string; mention: { type: string; page: { id: string } } }
+
+function getRichTexts(block: BlockObjectResponse): RichTextItem[] {
+  const b = block as unknown as Record<string, { rich_text?: RichTextItem[] }>
+  const inner = b[block.type]
+  if (inner && Array.isArray(inner.rich_text)) return inner.rich_text as RichTextItem[]
+  return []
 }

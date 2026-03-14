@@ -3,38 +3,56 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Navbar } from '@/components/Navbar'
-import { LayoutDashboard, GitMerge, Trash2, Network, Database, Sparkles, RefreshCw, AlertTriangle } from 'lucide-react'
+import { CyberLoader } from '@/components/CyberLoader'
+import { GitMerge, Trash2, Network, Database, Sparkles, AlertTriangle, RefreshCw, ScanSearch } from 'lucide-react'
 import type { WorkspaceStats } from '@/lib/notion/NotionClient'
+
+// ─── Stat Card ────────────────────────────────────────────────────────────────
 
 interface StatCardProps {
   label: string
-  value: number | string
+  value: number | string | null
   sub?: string
   accent?: 'blue' | 'purple' | 'amber' | 'emerald' | 'red'
   loading?: boolean
+  onScan?: () => void
+  scanLabel?: string
 }
 
-function StatCard({ label, value, sub, accent = 'blue', loading }: StatCardProps) {
+function StatCard({ label, value, sub, accent = 'blue', loading, onScan, scanLabel = 'Scan' }: StatCardProps) {
   const colors = {
-    blue:    'text-[#00d4ff] border-[#00d4ff]/30',
-    purple:  'text-[#7b2fff] border-[#7b2fff]/30',
-    amber:   'text-amber-400 border-amber-400/30',
-    emerald: 'text-emerald-400 border-emerald-400/30',
-    red:     'text-red-400 border-red-400/30',
+    blue:    { border: 'border-[#00d4ff]/30', text: 'text-[#00d4ff]' },
+    purple:  { border: 'border-[#7b2fff]/30', text: 'text-[#7b2fff]' },
+    amber:   { border: 'border-amber-400/30',  text: 'text-amber-400' },
+    emerald: { border: 'border-emerald-400/30', text: 'text-emerald-400' },
+    red:     { border: 'border-red-400/30',    text: 'text-red-400' },
   }
+  const { border, text } = colors[accent]
 
   return (
-    <div className={`glass-card rounded-xl p-6 border ${colors[accent]} flex flex-col gap-2`}>
+    <div className={`glass-card rounded-xl p-6 border ${border} flex flex-col gap-2`}>
       <span className="text-xs font-mono uppercase tracking-widest text-muted-foreground">{label}</span>
       {loading ? (
-        <div className="h-9 w-20 rounded bg-white/5 animate-pulse" />
+        <CyberLoader />
+      ) : value !== null ? (
+        <span className={`text-4xl font-bold font-mono ${text}`}>{value}</span>
       ) : (
-        <span className={`text-4xl font-bold font-mono ${colors[accent].split(' ')[0]}`}>{value}</span>
+        onScan && (
+          <button
+            onClick={onScan}
+            className={`mt-1 flex items-center gap-1.5 text-[11px] font-mono ${text} opacity-60 hover:opacity-100 transition-opacity`}
+          >
+            <ScanSearch size={12} />
+            {scanLabel}
+          </button>
+        )
       )}
       {sub && <span className="text-xs text-muted-foreground">{sub}</span>}
     </div>
   )
 }
+
+// ─── Feature Link ─────────────────────────────────────────────────────────────
 
 interface FeatureLinkProps {
   href: string
@@ -64,20 +82,25 @@ function FeatureLink({ href, icon, title, description, tag }: FeatureLinkProps) 
   )
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<WorkspaceStats | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [statsLoading, setStatsLoading] = useState(true)
+  const [emptyPages, setEmptyPages] = useState<number | null>(null)
+  const [emptyLoading, setEmptyLoading] = useState(false)
+  const [duplicates, setDuplicates] = useState<number | null>(null)
+  const [duplicatesLoading, setDuplicatesLoading] = useState(false)
+  const [linkDensity, setLinkDensity] = useState<number | null>(null)
+  const [linkDensityLoading, setLinkDensityLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const fetchStats = async () => {
-    setLoading(true)
+    setStatsLoading(true)
     setError(null)
     try {
       const res = await fetch('/api/workspace/stats')
-      if (res.status === 401) {
-        setError('not_connected')
-        return
-      }
+      if (res.status === 401) { setError('not_connected'); return }
       if (!res.ok) {
         const data = await res.json()
         setError(data.error ?? 'Failed to load stats')
@@ -87,7 +110,37 @@ export default function DashboardPage() {
     } catch {
       setError('Network error — check your connection.')
     } finally {
-      setLoading(false)
+      setStatsLoading(false)
+    }
+  }
+
+  const scanLinkDensity = async () => {
+    setLinkDensityLoading(true)
+    try {
+      const res = await fetch('/api/workspace/link-density')
+      if (res.ok) setLinkDensity((await res.json()).density)
+    } finally {
+      setLinkDensityLoading(false)
+    }
+  }
+
+  const scanDuplicates = async () => {
+    setDuplicatesLoading(true)
+    try {
+      const res = await fetch('/api/workspace/stats?stat=duplicateCandidates')
+      if (res.ok) setDuplicates((await res.json()).duplicateCandidates)
+    } finally {
+      setDuplicatesLoading(false)
+    }
+  }
+
+  const scanEmptyPages = async () => {
+    setEmptyLoading(true)
+    try {
+      const res = await fetch('/api/workspace/empty-pages')
+      if (res.ok) setEmptyPages((await res.json()).count)
+    } finally {
+      setEmptyLoading(false)
     }
   }
 
@@ -104,35 +157,25 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar rightSlot={
-        <Link href="/settings" className="neon-btn-ghost px-5 py-2 text-xs">Settings</Link>
+        <Link href="/settings" className="neon-btn-ghost px-8 py-3 text-sm">Settings</Link>
       } />
 
       <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-10 flex flex-col gap-10">
 
         {/* Header */}
-        <div className="flex items-start justify-between">
-          <div>
-            <h1
-              className="text-2xl font-bold neon-text"
-              style={{ fontFamily: 'var(--font-orbitron), sans-serif' }}
-            >
-              Workspace Health
-            </h1>
-            {workspaceName && (
-              <p className="text-muted-foreground text-sm mt-1">{workspaceName}</p>
-            )}
-          </div>
-          <button
-            onClick={fetchStats}
-            disabled={loading}
-            className="neon-btn-ghost px-4 py-2 text-xs flex items-center gap-2 disabled:opacity-40"
+        <div>
+          <h1
+            className="text-2xl font-bold neon-text"
+            style={{ fontFamily: 'var(--font-orbitron), sans-serif' }}
           >
-            <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-            Refresh
-          </button>
+            Workspace Health
+          </h1>
+          {workspaceName && (
+            <p className="text-muted-foreground text-sm mt-1">{workspaceName}</p>
+          )}
         </div>
 
-        {/* Not connected state */}
+        {/* Not connected */}
         {error === 'not_connected' && (
           <div className="glass-card rounded-xl p-8 border border-amber-400/30 flex flex-col items-center gap-4 text-center">
             <AlertTriangle size={32} className="text-amber-400" />
@@ -140,9 +183,7 @@ export default function DashboardPage() {
               <p className="font-semibold text-amber-400">Notion not connected</p>
               <p className="text-sm text-muted-foreground mt-1">Connect your workspace to see health stats.</p>
             </div>
-            <Link href="/settings" className="neon-btn px-6 py-2.5 text-sm">
-              Go to Settings →
-            </Link>
+            <Link href="/settings" className="neon-btn px-6 py-2.5 text-sm">Go to Settings →</Link>
           </div>
         )}
 
@@ -154,59 +195,96 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Stats grid */}
-        {!error && (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <StatCard
-              label="Total Pages"
-              value={stats?.totalPages ?? 0}
-              sub="in your workspace"
-              accent="blue"
-              loading={loading}
-            />
-            <StatCard
-              label="Orphan Pages"
-              value={stats?.orphanPages ?? 0}
-              sub="no inbound links"
-              accent={stats && stats.orphanPages > 10 ? 'amber' : 'emerald'}
-              loading={loading}
-            />
-            <StatCard
-              label="Empty Pages"
-              value={stats?.emptyPages ?? 0}
-              sub="no title"
-              accent={stats && stats.emptyPages > 5 ? 'amber' : 'emerald'}
-              loading={loading}
-            />
-            <StatCard
-              label="Duplicate Candidates"
-              value={stats?.duplicateCandidates ?? 0}
-              sub="matching titles"
-              accent={stats && stats.duplicateCandidates > 0 ? 'purple' : 'emerald'}
-              loading={loading}
-            />
-            <StatCard
-              label="Recently Edited"
-              value={stats?.recentlyEditedPages ?? 0}
-              sub="in the last 7 days"
-              accent="blue"
-              loading={loading}
-            />
-            <StatCard
-              label="Link Density"
-              value={loading ? '—' : `${Math.round((stats?.linkDensity ?? 0) * 100)}%`}
-              sub="pages with inbound links"
-              accent={stats && stats.linkDensity > 0.5 ? 'emerald' : 'amber'}
-              loading={loading}
-            />
-          </div>
-        )}
+        {!error && (<>
 
-        {/* Feature tools */}
-        {!error && (
-          <div>
-            <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-4"
-              style={{ fontFamily: 'var(--font-orbitron), sans-serif' }}>
+          {/* Quick Stats */}
+          <section className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h2
+                className="text-xs font-semibold uppercase tracking-widest text-muted-foreground"
+                style={{ fontFamily: 'var(--font-orbitron), sans-serif' }}
+              >
+                Quick Stats
+              </h2>
+              <button
+                onClick={fetchStats}
+                disabled={statsLoading}
+                className="neon-btn-ghost px-3 py-1.5 text-[11px] flex items-center gap-1.5 disabled:opacity-40"
+              >
+                <RefreshCw size={11} className={statsLoading ? 'animate-spin' : ''} />
+                Refresh
+              </button>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <StatCard
+                label="Total Pages"
+                value={stats?.totalPages ?? null}
+                sub="in your workspace"
+                accent="blue"
+                loading={statsLoading}
+              />
+              <StatCard
+                label="Top-level Pages"
+                value={stats?.topLevelPages ?? null}
+                sub="no parent page"
+                accent="blue"
+                loading={statsLoading}
+              />
+              <StatCard
+                label="Recently Edited"
+                value={stats?.recentlyEditedPages ?? null}
+                sub="in the last 7 days"
+                accent="blue"
+                loading={statsLoading}
+              />
+            </div>
+          </section>
+
+          {/* Deep Scans */}
+          <section className="flex flex-col gap-3">
+            <h2
+              className="text-xs font-semibold uppercase tracking-widest text-muted-foreground"
+              style={{ fontFamily: 'var(--font-orbitron), sans-serif' }}
+            >
+              Deep Scans
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <StatCard
+                label="Empty Pages"
+                value={emptyPages}
+                sub={emptyPages !== null ? 'no content blocks' : 'checks every page individually'}
+                accent={emptyPages !== null && emptyPages > 5 ? 'amber' : 'blue'}
+                loading={emptyLoading}
+                onScan={scanEmptyPages}
+                scanLabel={emptyPages !== null ? 'Rescan' : 'Scan'}
+              />
+              <StatCard
+                label="Duplicate Candidates"
+                value={duplicates}
+                sub={duplicates !== null ? 'title-based · semantic scan coming soon' : 'compares page titles only'}
+                accent={duplicates !== null && duplicates > 0 ? 'purple' : 'blue'}
+                loading={duplicatesLoading}
+                onScan={scanDuplicates}
+                scanLabel={duplicates !== null ? 'Rescan' : 'Scan'}
+              />
+              <StatCard
+                label="Link Density"
+                value={linkDensity !== null ? `${Math.round(linkDensity * 100)}%` : null}
+                sub={linkDensity !== null ? 'pages mentioned by other pages' : 'scans all page content for @mentions'}
+                accent={linkDensity !== null && linkDensity > 0.5 ? 'emerald' : 'blue'}
+                loading={linkDensityLoading}
+                onScan={scanLinkDensity}
+                scanLabel={linkDensity !== null ? 'Rescan' : 'Scan'}
+              />
+            </div>
+          </section>
+
+          {/* Feature tools */}
+          <section className="flex flex-col gap-3">
+            <h2
+              className="text-xs font-semibold uppercase tracking-widest text-muted-foreground"
+              style={{ fontFamily: 'var(--font-orbitron), sans-serif' }}
+            >
               Tools
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -246,10 +324,12 @@ export default function DashboardPage() {
                 tag="AI · MCP"
               />
             </div>
-          </div>
-        )}
+          </section>
+
+        </>)}
 
       </main>
     </div>
   )
 }
+

@@ -25,7 +25,7 @@ export async function GET() {
 
   response.cookies.set('notion_oauth_state', state, {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
     maxAge: 10 * 60, // 10 minutes

@@ -53,7 +53,10 @@ export default function Home() {
   const [connected, setConnected] = useState(false)
 
   useEffect(() => {
-    setConnected(document.cookie.includes('notion_workspace='))
+    fetch('/api/notion/status')
+      .then((r) => r.json())
+      .then((data) => { if (data.connected) setConnected(true) })
+      .catch(() => {})
   }, [])
 
   return (
