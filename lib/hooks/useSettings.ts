@@ -32,9 +32,11 @@ export function useSettings() {
   }, [])
 
   const save = (updates: Partial<Settings>) => {
-    const next = { ...settings, ...updates }
-    setSettings(next)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+    setSettings(prev => {
+      const next = { ...prev, ...updates }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+      return next
+    })
   }
 
   return { settings, save, loaded }
