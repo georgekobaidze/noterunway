@@ -68,11 +68,8 @@ export function NetworkBackground() {
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-      // Detect dark mode via CSS variable
-      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches ||
-        document.documentElement.classList.contains('dark')
-      const nodeColor = isDark ? '0, 212, 255' : '0, 150, 200'
-      const edgeColor = isDark ? '0, 212, 255' : '0, 150, 200'
+      const nodeColor = '0, 212, 255'
+      const edgeColor = '0, 212, 255'
 
       // Draw edges
       for (const edge of edges) {
