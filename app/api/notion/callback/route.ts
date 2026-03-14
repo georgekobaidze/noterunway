@@ -4,9 +4,16 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const code = searchParams.get('code')
   const error = searchParams.get('error')
+  const state = searchParams.get('state')
 
   if (error || !code) {
     return NextResponse.redirect(new URL('/settings?error=access_denied', req.url))
+  }
+
+  // Validate OAuth state parameter to prevent CSRF/login swapping
+  const storedState = req.cookies.get('notion_oauth_state')?.value
+  if (!state || !storedState || state !== storedState) {
+    return NextResponse.redirect(new URL('/settings?error=invalid_state', req.url))
   }
 
   const clientId = process.env.NOTION_OAUTH_CLIENT_ID
@@ -54,6 +61,8 @@ export async function GET(req: NextRequest) {
     maxAge: 60 * 60 * 24 * 30,
     path: '/',
   })
+  // Clear the OAuth state cookie to prevent reuse
+  response.cookies.delete('notion_oauth_state')
 
   return response
 }
