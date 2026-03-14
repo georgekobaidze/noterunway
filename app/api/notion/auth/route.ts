@@ -1,4 +1,5 @@
-import { redirect } from 'next/navigation'
+import { NextResponse } from 'next/server'
+import crypto from 'crypto'
 
 export async function GET() {
   const clientId = process.env.NOTION_OAUTH_CLIENT_ID
@@ -10,12 +11,25 @@ export async function GET() {
     })
   }
 
+  const state = crypto.randomBytes(16).toString('hex')
+
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
     owner: 'user',
+    state,
   })
 
-  redirect(`https://api.notion.com/v1/oauth/authorize?${params}`)
+  const response = NextResponse.redirect(`https://api.notion.com/v1/oauth/authorize?${params}`)
+
+  response.cookies.set('notion_oauth_state', state, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 10 * 60, // 10 minutes
+  })
+
+  return response
 }
