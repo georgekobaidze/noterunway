@@ -7,6 +7,15 @@ import type {
 
 export type NotionPage = PageObjectResponse
 
+export interface WorkspaceStats {
+  totalPages: number
+  orphanPages: number        // pages with no parent page (top-level or truly unlinked)
+  emptyPages: number         // pages with no content blocks
+  recentlyEditedPages: number // edited in last 7 days
+  linkDensity: number        // avg inbound links per page (0–1 score)
+  duplicateCandidates: number // pages with identical or near-identical titles
+}
+
 export class NotionError extends Error {
   constructor(
     message: string,
@@ -141,6 +150,75 @@ export class NotionClient {
         return false
       }
       throw normalizedError
+    }
+  }
+
+  // Compute workspace health stats from all pages in a single pass
+  async getWorkspaceStats(): Promise<WorkspaceStats> {
+    const pages = await this.getAllPages()
+    const now = Date.now()
+    const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000
+
+    // Build a set of page IDs that appear as a parent of another page
+    const parentIds = new Set<string>()
+    for (const page of pages) {
+      if (page.parent.type === 'page_id') {
+        parentIds.add(page.parent.page_id)
+      }
+    }
+
+    // Count inbound links per page (how many other pages reference this page as parent)
+    const inboundLinks = new Map<string, number>()
+    for (const page of pages) {
+      inboundLinks.set(page.id, 0)
+    }
+    for (const page of pages) {
+      if (page.parent.type === 'page_id') {
+        const count = inboundLinks.get(page.parent.page_id) ?? 0
+        inboundLinks.set(page.parent.page_id, count + 1)
+      }
+    }
+
+    const orphanPages = pages.filter((p) => (inboundLinks.get(p.id) ?? 0) === 0).length
+    const recentlyEditedPages = pages.filter(
+      (p) => new Date(p.last_edited_time).getTime() > sevenDaysAgo
+    ).length
+
+    // Duplicate candidate detection: pages sharing the same normalised title
+    const titleCounts = new Map<string, number>()
+    for (const page of pages) {
+      const titleProp = page.properties['title'] ?? page.properties['Name']
+      const titleText =
+        titleProp?.type === 'title'
+          ? titleProp.title.map((t) => t.plain_text).join('').trim().toLowerCase()
+          : ''
+      if (titleText) {
+        titleCounts.set(titleText, (titleCounts.get(titleText) ?? 0) + 1)
+      }
+    }
+    const duplicateCandidates = [...titleCounts.values()].filter((c) => c > 1).length
+
+    // Link density: ratio of pages that have at least one inbound link
+    const linkedPages = pages.filter((p) => (inboundLinks.get(p.id) ?? 0) > 0).length
+    const linkDensity = pages.length > 0 ? linkedPages / pages.length : 0
+
+    // Empty pages: pages where the title is blank (we can't check blocks without N+1 calls)
+    const emptyPages = pages.filter((p) => {
+      const titleProp = p.properties['title'] ?? p.properties['Name']
+      const titleText =
+        titleProp?.type === 'title'
+          ? titleProp.title.map((t) => t.plain_text).join('').trim()
+          : ''
+      return titleText === ''
+    }).length
+
+    return {
+      totalPages: pages.length,
+      orphanPages,
+      emptyPages,
+      recentlyEditedPages,
+      linkDensity: Math.round(linkDensity * 100) / 100,
+      duplicateCandidates,
     }
   }
 

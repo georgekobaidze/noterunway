@@ -1,3 +1,6 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import { NetworkBackground } from '@/components/Landing/NetworkBackground'
 import { TerminalDemo } from '@/components/Landing/TerminalDemo'
 import { FeatureCard } from '@/components/Landing/FeatureCard'
@@ -47,14 +50,20 @@ const FEATURES = [
 const PROVIDERS = ['OpenAI', 'Anthropic', 'xAI Grok']
 
 export default function Home() {
+  const [connected, setConnected] = useState(false)
+
+  useEffect(() => {
+    setConnected(document.cookie.includes('notion_workspace='))
+  }, [])
+
   return (
     <div className="relative min-h-screen overflow-x-hidden">
       <NetworkBackground />
 
       <Navbar rightSlot={
-        <Link href="/settings" className="neon-btn px-8 py-3 text-sm">
-          Connect Notion →
-        </Link>
+        connected
+          ? <Link href="/dashboard" className="neon-btn px-8 py-3 text-sm">Go to Dashboard →</Link>
+          : <Link href="/settings" className="neon-btn px-8 py-3 text-sm">Connect Notion →</Link>
       } />
 
       {/* Hero */}
@@ -79,10 +88,10 @@ export default function Home() {
 
         <div className="flex flex-col sm:flex-row gap-4 mt-10">
           <Link
-            href="/settings"
+            href={connected ? '/dashboard' : '/settings'}
             className="neon-btn px-8 py-3"
           >
-            Connect Notion — it&apos;s free
+            {connected ? 'Go to Dashboard →' : "Connect Notion — it's free"}
           </Link>
           <a
             href="https://github.com/georgekobaidze/noterunway"
