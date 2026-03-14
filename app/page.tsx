@@ -1,5 +1,3 @@
-'use client'
-
 import { NetworkBackground } from '@/components/Landing/NetworkBackground'
 import { TerminalDemo } from '@/components/Landing/TerminalDemo'
 import { FeatureCard } from '@/components/Landing/FeatureCard'
