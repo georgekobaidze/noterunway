@@ -23,14 +23,19 @@ export default function SettingsPage() {
   const searchParams = useSearchParams()
   const { settings, save, loaded } = useSettings()
   const [notionWorkspace, setNotionWorkspace] = useState<{ name: string; id: string } | null>(null)
+  const [connected, setConnected] = useState(false)
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
-    // Read workspace cookie set by OAuth callback
-    const match = document.cookie.match(/notion_workspace=([^;]+)/)
-    if (match) {
-      try { setNotionWorkspace(JSON.parse(decodeURIComponent(match[1]))) } catch {}
-    }
+    fetch('/api/notion/status')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.connected) {
+          setConnected(true)
+          setNotionWorkspace(data.workspace)
+        }
+      })
+      .catch(() => {})
   }, [searchParams])
 
   const handleSave = (e: React.FormEvent) => {
@@ -39,7 +44,6 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 2000)
   }
 
-  const connected = searchParams.get('connected') === 'true' || !!notionWorkspace
   const oauthError = searchParams.get('error')
 
   return (
@@ -78,20 +82,33 @@ export default function SettingsPage() {
               )}
 
               {connected && notionWorkspace ? (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-emerald-400">✦ Connected</p>
-                    <p className="text-foreground font-medium">{notionWorkspace.name}</p>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-emerald-400">✦ Connected</p>
+                      <p className="text-foreground font-medium">{notionWorkspace.name}</p>
+                    </div>
+                    <a href="/api/notion/auth" className="neon-btn-ghost px-4 py-2 text-xs">
+                      Reconnect
+                    </a>
                   </div>
-                  <a href="/api/notion/auth" className="neon-btn-ghost px-4 py-2 text-xs">
-                    Reconnect
-                  </a>
+                  <p className="text-[11px] text-muted-foreground/60 font-mono">
+                    New pages not showing up? Reconnect and select your workspace name at the top of Notion&apos;s page list to grant access to all pages.
+                  </p>
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
                   <p className="text-muted-foreground text-sm">
                     Authorize NoteRunway to access your Notion workspace. You&apos;ll be redirected to Notion and back.
                   </p>
+                  <div className="flex items-start gap-2 px-3 py-2.5 rounded border border-emerald-400/30 bg-emerald-400/5 text-xs text-emerald-400 font-mono">
+                    <span className="mt-px shrink-0">⚠</span>
+                    <span>
+                      On the Notion authorization screen, select{' '}
+                      <strong className="text-emerald-300">your workspace name at the top of the page list</strong>
+                      {' '}— not individual pages. This grants access to all pages including ones you create later.
+                    </span>
+                  </div>
                   <a href="/api/notion/auth" className="neon-btn px-6 py-2.5 self-start">
                     Connect Notion →
                   </a>
