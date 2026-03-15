@@ -177,7 +177,7 @@ export class NotionClient {
       (p) => new Date(p.last_edited_time).getTime() > sevenDaysAgo
     ).length
 
-    // Duplicate candidate detection: pages sharing the same normalised title
+    // Duplicate candidate detection: count pages whose normalised title appears more than once
     const titleCounts = new Map<string, number>()
     for (const page of pages) {
       const titleProp = page.properties['title'] ?? page.properties['Name']
@@ -189,7 +189,10 @@ export class NotionClient {
         titleCounts.set(titleText, (titleCounts.get(titleText) ?? 0) + 1)
       }
     }
-    const duplicateCandidates = [...titleCounts.values()].filter((c) => c > 1).length
+    const duplicateCandidates = [...titleCounts.values()].reduce(
+      (sum, count) => (count > 1 ? sum + count : sum),
+      0
+    )
 
     return {
       totalPages: pages.length,
