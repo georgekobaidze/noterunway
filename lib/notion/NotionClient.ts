@@ -7,6 +7,20 @@ import type {
 
 export type NotionPage = PageObjectResponse
 
+// Cache of all pages per Notion client instance to avoid redundant pagination.
+// WeakMap is used so that entries do not prevent garbage collection of client instances.
+const allPagesCache: WeakMap<object, NotionPage[]> = new WeakMap()
+
+async function getOrFetchAllPages(
+  self: { getAllPages: () => Promise<NotionPage[]> }
+): Promise<NotionPage[]> {
+  const cached = allPagesCache.get(self)
+  if (cached) return cached
+  const pages = await self.getAllPages()
+  allPagesCache.set(self, pages)
+  return pages
+}
+
 export interface WorkspaceStats {
   totalPages: number
   topLevelPages: number
@@ -153,7 +167,7 @@ export class NotionClient {
 
   // Compute workspace health stats from all pages in a single pass
   async getWorkspaceStats(): Promise<WorkspaceStats> {
-    const pages = await this.getAllPages()
+    const pages = await getOrFetchAllPages(this)
     const now = Date.now()
     const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000
 
@@ -188,7 +202,7 @@ export class NotionClient {
   // Compute true link density by scanning block content for page mentions.
   // Returns the fraction of pages that are mentioned by at least one other page.
   async getLinkDensity(): Promise<number> {
-    const pages = await this.getAllPages()
+    const pages = await getOrFetchAllPages(this)
     if (pages.length === 0) return 0
 
     const pageIds = new Set(pages.map((p) => p.id))
