@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Navbar } from '@/components/Navbar'
@@ -11,15 +11,25 @@ const PROVIDER_MODELS = {
   openai:    MODEL_META.filter((m) => m.provider === 'openai'),
   anthropic: MODEL_META.filter((m) => m.provider === 'anthropic'),
   xai:       MODEL_META.filter((m) => m.provider === 'xai'),
+  google:    MODEL_META.filter((m) => m.provider === 'google'),
 }
 
 const PROVIDER_KEY_PLACEHOLDER = {
   openai:    'sk-...',
   anthropic: 'sk-ant-...',
   xai:       'xai-...',
+  google:    'AIza...',
 }
 
 export default function SettingsPage() {
+  return (
+    <Suspense>
+      <SettingsPageInner />
+    </Suspense>
+  )
+}
+
+function SettingsPageInner() {
   const searchParams = useSearchParams()
   const { settings, save, loaded } = useSettings()
   const [notionWorkspace, setNotionWorkspace] = useState<{ name: string; id: string } | null>(null)
@@ -131,7 +141,7 @@ export default function SettingsPage() {
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs text-muted-foreground uppercase tracking-widest">Provider</label>
                   <div className="flex gap-2">
-                    {(['openai', 'anthropic', 'xai'] as const).map((p) => (
+                    {(['openai', 'anthropic', 'xai', 'google'] as const).map((p) => (
                       <button
                         key={p}
                         type="button"
@@ -143,7 +153,7 @@ export default function SettingsPage() {
                         }`}
                         style={{ fontFamily: 'var(--font-orbitron), sans-serif', letterSpacing: '0.08em' }}
                       >
-                        {p === 'xai' ? 'xAI Grok' : p.charAt(0).toUpperCase() + p.slice(1)}
+                        {p === 'xai' ? 'xAI Grok' : p === 'google' ? 'Google' : p.charAt(0).toUpperCase() + p.slice(1)}
                       </button>
                     ))}
                   </div>

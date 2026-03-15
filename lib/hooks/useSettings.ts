@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import type { ModelId } from '@/lib/models'
 
 export interface Settings {
-  aiProvider: 'openai' | 'anthropic' | 'xai'
+  aiProvider: 'openai' | 'anthropic' | 'xai' | 'google'
   aiKey: string
   modelId: ModelId
 }

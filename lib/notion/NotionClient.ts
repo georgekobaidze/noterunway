@@ -7,6 +7,22 @@ import type {
 
 export type NotionPage = PageObjectResponse
 
+export type ArchiveFeature = 'duplicates' | 'garbage' | 'ask'
+
+export interface ArchiveFolderIds {
+  root: string
+  duplicates: string
+  garbage: string
+  ask: string
+}
+
+const ARCHIVE_ROOT_TITLE = '🗂️ NoteRunway Archive'
+const ARCHIVE_FOLDER_TITLES: Record<ArchiveFeature, string> = {
+  duplicates: '🔁 Duplicates',
+  garbage:    '🗑️ Garbage Collection',
+  ask:        '✨ Semantic Ask',
+}
+
 // Cache of all pages per Notion client instance to avoid redundant pagination.
 // WeakMap is used so that entries do not prevent garbage collection of client instances.
 const allPagesCache: WeakMap<object, NotionPage[]> = new WeakMap()
@@ -121,6 +137,32 @@ export class NotionClient {
     }
 
     return blocks
+  }
+
+  // Fetch a plain-text snippet from a page's top-level blocks (shallow, fast).
+  // Returns at most `maxChars` characters of content, or empty string on failure.
+  async getPageTextSnippet(pageId: string, maxChars = 500): Promise<string> {
+    try {
+      const res = await this.client.blocks.children.list({
+        block_id: pageId,
+        page_size: 30,
+      })
+      const texts: string[] = []
+      for (const block of res.results) {
+        if (!('type' in block)) continue
+        const b = block as BlockObjectResponse
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const inner = (b as any)[b.type] as { rich_text?: Array<{ plain_text: string }> } | undefined
+        if (inner?.rich_text && Array.isArray(inner.rich_text)) {
+          const text = inner.rich_text.map((t) => t.plain_text ?? '').join('')
+          if (text.trim()) texts.push(text.trim())
+        }
+      }
+      const snippet = texts.join(' ')
+      return snippet.length > maxChars ? snippet.slice(0, maxChars) + '…' : snippet
+    } catch {
+      return ''
+    }
   }
 
   // Soft-delete (archive) a page
@@ -273,6 +315,188 @@ export class NotionClient {
     }
 
     return emptyCount
+  }
+
+  // ─── Archive folder management ──────────────────────────────────────────────
+
+  // Ensures the NoteRunway Archive folder structure exists in the workspace.
+  // Creates root + feature subfolders if any are missing. Safe to call repeatedly.
+  async ensureArchiveStructure(): Promise<ArchiveFolderIds> {
+    const rootId = await this.findOrCreateWorkspacePage(ARCHIVE_ROOT_TITLE)
+
+    const folderIds = {} as Record<ArchiveFeature, string>
+    for (const feature of ['duplicates', 'garbage', 'ask'] as ArchiveFeature[]) {
+      folderIds[feature] = await this.findOrCreateChildPage(rootId, ARCHIVE_FOLDER_TITLES[feature])
+    }
+
+    return { root: rootId, ...folderIds }
+  }
+
+  // Moves a page to the archive folder for the given feature by:
+  // 1. Creating an audit stub page in the feature subfolder
+  // 2. Archiving (soft-deleting) the original page to Notion Trash
+  // NOTE: Notion API does not support re-parenting existing pages, so the
+  // stub acts as an audit record while the original goes to Trash.
+  async moveToArchive(
+    pageId: string,
+    feature: ArchiveFeature,
+    meta?: { title?: string; reason?: string; keepTitle?: string }
+  ): Promise<void> {
+    const ids = await this.ensureArchiveStructure()
+    const folderId = ids[feature]
+    const date = new Date().toLocaleDateString('en-US', {
+      year: 'numeric', month: 'long', day: 'numeric',
+    })
+    const stubTitle = meta?.title ?? `Archived page (${pageId})`
+
+    // Build body blocks for the stub
+    const bodyBlocks: Parameters<typeof this.client.blocks.children.append>[0]['children'] = [
+      {
+        type: 'callout',
+        callout: {
+          icon: { type: 'emoji', emoji: '🗂️' },
+          rich_text: [{ type: 'text', text: { content: `Archived by NoteRunway · ${date}` } }],
+          color: 'gray_background',
+        },
+      },
+    ]
+
+    if (meta?.reason) {
+      bodyBlocks.push({
+        type: 'paragraph',
+        paragraph: {
+          rich_text: [
+            { type: 'text', text: { content: 'Reason: ' }, annotations: { bold: true } },
+            { type: 'text', text: { content: meta.reason } },
+          ],
+        },
+      })
+    }
+
+    if (meta?.keepTitle) {
+      bodyBlocks.push({
+        type: 'paragraph',
+        paragraph: {
+          rich_text: [
+            { type: 'text', text: { content: 'Kept version: ' }, annotations: { bold: true } },
+            { type: 'text', text: { content: meta.keepTitle } },
+          ],
+        },
+      })
+    }
+
+    bodyBlocks.push({
+      type: 'paragraph',
+      paragraph: {
+        rich_text: [
+          {
+            type: 'text',
+            text: { content: 'To restore: find the original page in Notion\'s Trash (sidebar → Trash).' },
+            annotations: { italic: true, color: 'gray' },
+          },
+        ],
+      },
+    })
+
+    try {
+      await this.client.pages.create({
+        parent: { page_id: folderId },
+        properties: {
+          title: { title: [{ type: 'text', text: { content: stubTitle } }] },
+        },
+        children: bodyBlocks,
+      })
+    } catch {
+      // Non-fatal — still archive the original even if stub creation fails
+    }
+
+    await this.archivePage(pageId)
+  }
+
+  // Searches for a workspace-level page by exact title. Returns its ID or null.
+  private async findWorkspacePageByTitle(title: string): Promise<string | null> {
+    try {
+      const res = await this.client.search({
+        query: title,
+        filter: { property: 'object', value: 'page' },
+        page_size: 20,
+      })
+      for (const result of res.results) {
+        if (!isFullPage(result)) continue
+        const titleProp = result.properties['title'] ?? result.properties['Name']
+        const pageTitle =
+          titleProp?.type === 'title'
+            ? titleProp.title.map((t) => t.plain_text).join('').trim()
+            : ''
+        if (pageTitle === title) return result.id
+      }
+      return null
+    } catch {
+      return null
+    }
+  }
+
+  // Searches for a child page with the given title inside a parent page.
+  private async findChildPageByTitle(parentId: string, title: string): Promise<string | null> {
+    try {
+      let cursor: string | undefined
+      do {
+        const res = await this.client.blocks.children.list({
+          block_id: parentId,
+          start_cursor: cursor,
+          page_size: 100,
+        })
+        for (const block of res.results) {
+          if (!('type' in block)) continue
+          const b = block as BlockObjectResponse
+          if (b.type === 'child_page') {
+            const cp = b as unknown as { child_page: { title: string } }
+            if (cp.child_page.title === title) return b.id
+          }
+        }
+        cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined
+      } while (cursor)
+      return null
+    } catch {
+      return null
+    }
+  }
+
+  // Finds a workspace-level page by title, creating it if it doesn't exist.
+  private async findOrCreateWorkspacePage(title: string): Promise<string> {
+    const existing = await this.findWorkspacePageByTitle(title)
+    if (existing) return existing
+
+    try {
+      const page = await this.client.pages.create({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        parent: { workspace: true } as any,
+        properties: {
+          title: { title: [{ type: 'text', text: { content: title } }] },
+        },
+      })
+      return page.id
+    } catch (err) {
+      throw this.handleError(err)
+    }
+  }
+
+  // Finds a child page by title inside a parent, creating it if it doesn't exist.
+  private async findOrCreateChildPage(parentId: string, title: string): Promise<string> {
+    const existing = await this.findChildPageByTitle(parentId, title)
+    if (existing) return existing
+
+    try {
+      const page = await this.client.pages.create({
+        parent: { page_id: parentId },
+        properties: {
+          title: { title: [{ type: 'text', text: { content: title } }] },
+        },
+      })
+      return page.id
+    } catch (err) {
+      throw this.handleError(err)
+    }
   }
 
   private handleError(err: unknown): NotionError {
