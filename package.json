@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed": "ts-node --project tsconfig.json scripts/seed-test-workspace.ts"
   },
   "engines": {
     "node": ">=20.9.0"

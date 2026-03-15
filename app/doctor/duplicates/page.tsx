@@ -139,7 +139,7 @@ function GroupCard({ group, onArchive, onSkip, archiving, archived }: GroupCardP
 
 export default function DuplicatesPage() {
   const { settings, loaded } = useSettings()
-  const [result, setResult] = useState<(DuplicateDetectionResult & { stats?: { totalPages: number; scannedPages: number; exactMatchGroups: number; aiGroups: number } }) | null>(null)
+  const [result, setResult] = useState<(DuplicateDetectionResult & { stats?: { totalPages: number; scannedPages: number; skippedEmpty?: number; exactMatchGroups: number; aiGroups: number } }) | null>(null)
   const [scanning, setScanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // keyed by the first page id in the group as a stable group identifier
@@ -183,15 +183,14 @@ export default function DuplicatesPage() {
   const handleArchive = async (group: DuplicateGroup, keepId: string) => {
     const key = groupKey(group)
     setArchiving(key)
-    const archiveIds = group.pages.filter((p) => p.id !== keepId).map((p) => p.id)
+    const archivePages = group.pages.filter((p) => p.id !== keepId).map((p) => ({ id: p.id, title: p.title }))
     const keepPage = group.pages.find((p) => p.id === keepId)
     try {
       const res = await fetch('/api/duplicates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          archiveIds,
-          keepId,
+          archivePages,
           keepTitle: keepPage?.title ?? '',
           reason: group.reason,
         }),
@@ -282,6 +281,7 @@ export default function DuplicatesPage() {
               {result.stats && (
                 <span className="text-[11px] font-mono text-muted-foreground/60">
                   {result.stats.scannedPages} pages scanned
+                  {(result.stats.skippedEmpty ?? 0) > 0 && ` · ${result.stats.skippedEmpty} empty skipped`}
                   {result.stats.exactMatchGroups > 0 && ` · ${result.stats.exactMatchGroups} exact title match${result.stats.exactMatchGroups !== 1 ? 'es' : ''}`}
                   {result.stats.aiGroups > 0 && ` · ${result.stats.aiGroups} AI-detected`}
                 </span>
