@@ -42,9 +42,9 @@ const duplicatesSchema = z.object({
           id: z.string(),
           title: z.string(),
         })
-      ).min(2),
+      ).describe('Must contain at least 2 pages'),
       suggestedKeepId: z.string().describe('ID of the best version to keep'),
-      similarity: z.number().min(0).max(1),
+      similarity: z.number().describe('Similarity score between 0.75 and 1.0'),
       reason: z.string().describe('One sentence explaining why these are duplicates'),
     })
   ),
@@ -152,15 +152,20 @@ export async function GET(req: NextRequest) {
       temperature: 0,
     })
 
+    // Post-process: filter single-page groups and clamp similarity
+    const validGroups = object.groups
+      .filter((g) => g.pages.length >= 2)
+      .map((g) => ({ ...g, similarity: Math.min(1, Math.max(0, g.similarity)) }))
+
     return NextResponse.json({
       reasoning: object.reasoning,
-      groups: object.groups,
+      groups: validGroups,
       stats: {
         totalPages: allPages.length,
         scannedPages: pagesWithContent.length,
         skippedEmpty: skippedEmpty,
         exactMatchGroups: 0,
-        aiGroups: object.groups.length,
+        aiGroups: validGroups.length,
       },
     })
   } catch (err: unknown) {

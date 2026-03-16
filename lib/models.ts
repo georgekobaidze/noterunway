@@ -8,10 +8,9 @@ export type ModelId =
   | 'gpt-4.1'
   | 'gpt-4o'
   | 'gpt-4o-mini'
-  | 'claude-sonnet-4-5'
-  | 'claude-3-7-sonnet'
-  | 'claude-3-5-sonnet'
-  | 'claude-3-haiku'
+  | 'claude-opus-4-6'
+  | 'claude-sonnet-4-6'
+  | 'claude-haiku-4-5'
   | 'grok-4'
   | 'grok-4-1-fast'
   | 'grok-3'
@@ -31,10 +30,9 @@ export const MODEL_META: ModelMeta[] = [
   { id: 'gpt-4.1',           label: 'GPT-4.1',             provider: 'openai',    tier: 'smart' },
   { id: 'gpt-4o',            label: 'GPT-4o',              provider: 'openai',    tier: 'smart' },
   { id: 'gpt-4o-mini',       label: 'GPT-4o Mini',         provider: 'openai',    tier: 'fast'  },
-  { id: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5',   provider: 'anthropic', tier: 'smart' },
-  { id: 'claude-3-7-sonnet', label: 'Claude 3.7 Sonnet',   provider: 'anthropic', tier: 'smart' },
-  { id: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet',   provider: 'anthropic', tier: 'smart' },
-  { id: 'claude-3-haiku',    label: 'Claude 3 Haiku',      provider: 'anthropic', tier: 'fast'  },
+  { id: 'claude-opus-4-6',   label: 'Claude Opus 4.6',     provider: 'anthropic', tier: 'smart' },
+  { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6',   provider: 'anthropic', tier: 'smart' },
+  { id: 'claude-haiku-4-5',  label: 'Claude Haiku 4.5',    provider: 'anthropic', tier: 'fast'  },
   { id: 'grok-4',            label: 'Grok 4',              provider: 'xai',       tier: 'smart' },
   { id: 'grok-4-1-fast',     label: 'Grok 4.1 Fast',       provider: 'xai',       tier: 'fast'  },
   { id: 'grok-3',            label: 'Grok 3',              provider: 'xai',       tier: 'smart' },
@@ -51,10 +49,9 @@ export function getModel(id: ModelId): LanguageModel {
     case 'gpt-4.1':           return openai('gpt-4.1')
     case 'gpt-4o':            return openai('gpt-4o')
     case 'gpt-4o-mini':       return openai('gpt-4o-mini')
-    case 'claude-sonnet-4-5': return anthropic('claude-sonnet-4-5')
-    case 'claude-3-7-sonnet': return anthropic('claude-3-7-sonnet-20250219')
-    case 'claude-3-5-sonnet': return anthropic('claude-3-5-sonnet-20241022')
-    case 'claude-3-haiku':    return anthropic('claude-3-haiku-20240307')
+    case 'claude-opus-4-6':   return anthropic('claude-opus-4-6')
+    case 'claude-sonnet-4-6': return anthropic('claude-sonnet-4-6')
+    case 'claude-haiku-4-5':  return anthropic('claude-haiku-4-5-20251001')
     case 'grok-4':            return xai('grok-4')
     case 'grok-4-1-fast':     return xai('grok-4-1-fast')
     case 'grok-3':            return xai('grok-3-latest')
@@ -71,10 +68,9 @@ const MODEL_SDK_ID: Record<ModelId, string> = {
   'gpt-4.1':           'gpt-4.1',
   'gpt-4o':            'gpt-4o',
   'gpt-4o-mini':       'gpt-4o-mini',
-  'claude-sonnet-4-5': 'claude-sonnet-4-5',
-  'claude-3-7-sonnet': 'claude-3-7-sonnet-20250219',
-  'claude-3-5-sonnet': 'claude-3-5-sonnet-20241022',
-  'claude-3-haiku':    'claude-3-haiku-20240307',
+  'claude-opus-4-6':   'claude-opus-4-6',
+  'claude-sonnet-4-6': 'claude-sonnet-4-6',
+  'claude-haiku-4-5':  'claude-haiku-4-5-20251001',
   'grok-4':            'grok-4',
   'grok-4-1-fast':     'grok-4-1-fast',
   'grok-3':            'grok-3-latest',
