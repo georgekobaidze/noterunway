@@ -89,8 +89,7 @@ export default function DashboardPage() {
   const [statsLoading, setStatsLoading] = useState(true)
   const [emptyPages, setEmptyPages] = useState<number | null>(null)
   const [emptyLoading, setEmptyLoading] = useState(false)
-  const [duplicates, setDuplicates] = useState<number | null>(null)
-  const [duplicatesLoading, setDuplicatesLoading] = useState(false)
+  
   const [linkDensity, setLinkDensity] = useState<number | null>(null)
   const [linkDensityLoading, setLinkDensityLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -121,16 +120,6 @@ export default function DashboardPage() {
       if (res.ok) setLinkDensity((await res.json()).density)
     } finally {
       setLinkDensityLoading(false)
-    }
-  }
-
-  const scanDuplicates = async () => {
-    setDuplicatesLoading(true)
-    try {
-      const res = await fetch('/api/workspace/stats?stat=duplicateCandidates')
-      if (res.ok) setDuplicates((await res.json()).duplicateCandidates)
-    } finally {
-      setDuplicatesLoading(false)
     }
   }
 
@@ -257,15 +246,6 @@ export default function DashboardPage() {
                 loading={emptyLoading}
                 onScan={scanEmptyPages}
                 scanLabel={emptyPages !== null ? 'Rescan' : 'Scan'}
-              />
-              <StatCard
-                label="Duplicate Candidates"
-                value={duplicates}
-                sub={duplicates !== null ? 'title-based · semantic scan coming soon' : 'compares page titles only'}
-                accent={duplicates !== null && duplicates > 0 ? 'purple' : 'blue'}
-                loading={duplicatesLoading}
-                onScan={scanDuplicates}
-                scanLabel={duplicates !== null ? 'Rescan' : 'Scan'}
               />
               <StatCard
                 label="Link Density"

@@ -31,7 +31,7 @@ export default function SettingsPage() {
 
 function SettingsPageInner() {
   const searchParams = useSearchParams()
-  const { settings, save, loaded } = useSettings()
+  const { settings, aiKey, save, loaded } = useSettings()
   const [notionWorkspace, setNotionWorkspace] = useState<{ name: string; id: string } | null>(null)
   const [connected, setConnected] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -183,10 +183,12 @@ function SettingsPageInner() {
 
                 {/* API Key */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs text-muted-foreground uppercase tracking-widest">API Key</label>
+                  <label className="text-xs text-muted-foreground uppercase tracking-widest">
+                    {settings.aiProvider === 'xai' ? 'xAI' : settings.aiProvider.charAt(0).toUpperCase() + settings.aiProvider.slice(1)} API Key
+                  </label>
                   <input
                     type="password"
-                    value={settings.aiKey}
+                    value={aiKey}
                     onChange={(e) => save({ aiKey: e.target.value })}
                     placeholder={PROVIDER_KEY_PLACEHOLDER[settings.aiProvider]}
                     className="bg-transparent border border-border rounded px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/40 focus:border-[#00d4ff] focus:outline-none transition-colors"

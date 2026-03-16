@@ -138,7 +138,7 @@ function GroupCard({ group, onArchive, onSkip, archiving, archived }: GroupCardP
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DuplicatesPage() {
-  const { settings, loaded } = useSettings()
+  const { settings, aiKey, loaded } = useSettings()
   const [result, setResult] = useState<(DuplicateDetectionResult & { stats?: { totalPages: number; scannedPages: number; skippedEmpty?: number; exactMatchGroups: number; aiGroups: number } }) | null>(null)
   const [scanning, setScanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -150,7 +150,7 @@ export default function DuplicatesPage() {
   const groupKey = (g: DuplicateGroup) => g.pages.map((p) => p.id).sort().join(',')
 
   const runScan = async () => {
-    if (!settings.aiKey) {
+    if (!aiKey) {
       setError('No AI key configured. Go to Settings and add your API key.')
       return
     }
@@ -163,7 +163,7 @@ export default function DuplicatesPage() {
     try {
       const res = await fetch('/api/duplicates', {
         headers: {
-          'x-ai-key': settings.aiKey,
+          'x-ai-key': aiKey,
           'x-ai-model': settings.modelId,
         },
       })
@@ -240,7 +240,7 @@ export default function DuplicatesPage() {
         </div>
 
         {/* No AI key warning */}
-        {loaded && !settings.aiKey && (
+        {loaded && !aiKey && (
           <div className="glass-card rounded-xl p-5 border border-amber-400/30 flex items-start gap-3">
             <AlertTriangle size={16} className="text-amber-400 shrink-0 mt-0.5" />
             <div className="text-sm">

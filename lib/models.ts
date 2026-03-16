@@ -12,8 +12,10 @@ export type ModelId =
   | 'claude-3-7-sonnet'
   | 'claude-3-5-sonnet'
   | 'claude-3-haiku'
+  | 'grok-4'
+  | 'grok-4-1-fast'
   | 'grok-3'
-  | 'grok-2'
+  | 'grok-3-mini'
   | 'gemini-2.5-pro'
   | 'gemini-2.5-flash'
 
@@ -33,8 +35,10 @@ export const MODEL_META: ModelMeta[] = [
   { id: 'claude-3-7-sonnet', label: 'Claude 3.7 Sonnet',   provider: 'anthropic', tier: 'smart' },
   { id: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet',   provider: 'anthropic', tier: 'smart' },
   { id: 'claude-3-haiku',    label: 'Claude 3 Haiku',      provider: 'anthropic', tier: 'fast'  },
+  { id: 'grok-4',            label: 'Grok 4',              provider: 'xai',       tier: 'smart' },
+  { id: 'grok-4-1-fast',     label: 'Grok 4.1 Fast',       provider: 'xai',       tier: 'fast'  },
   { id: 'grok-3',            label: 'Grok 3',              provider: 'xai',       tier: 'smart' },
-  { id: 'grok-2',            label: 'Grok 2',              provider: 'xai',       tier: 'fast'  },
+  { id: 'grok-3-mini',       label: 'Grok 3 Mini',         provider: 'xai',       tier: 'fast'  },
   { id: 'gemini-2.5-pro',   label: 'Gemini 2.5 Pro',   provider: 'google', tier: 'smart' },
   { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', provider: 'google', tier: 'fast'  },
 ]
@@ -51,8 +55,10 @@ export function getModel(id: ModelId): LanguageModel {
     case 'claude-3-7-sonnet': return anthropic('claude-3-7-sonnet-20250219')
     case 'claude-3-5-sonnet': return anthropic('claude-3-5-sonnet-20241022')
     case 'claude-3-haiku':    return anthropic('claude-3-haiku-20240307')
-    case 'grok-3':            return xai('grok-3')
-    case 'grok-2':            return xai('grok-2-1212')
+    case 'grok-4':            return xai('grok-4')
+    case 'grok-4-1-fast':     return xai('grok-4-1-fast')
+    case 'grok-3':            return xai('grok-3-latest')
+    case 'grok-3-mini':       return xai('grok-3-mini')
     case 'gemini-2.5-pro':   return google('gemini-2.5-pro')
     case 'gemini-2.5-flash': return google('gemini-2.5-flash')
   }
@@ -69,8 +75,10 @@ const MODEL_SDK_ID: Record<ModelId, string> = {
   'claude-3-7-sonnet': 'claude-3-7-sonnet-20250219',
   'claude-3-5-sonnet': 'claude-3-5-sonnet-20241022',
   'claude-3-haiku':    'claude-3-haiku-20240307',
-  'grok-3':            'grok-3',
-  'grok-2':            'grok-2-1212',
+  'grok-4':            'grok-4',
+  'grok-4-1-fast':     'grok-4-1-fast',
+  'grok-3':            'grok-3-latest',
+  'grok-3-mini':       'grok-3-mini',
   'gemini-2.5-pro':   'gemini-2.5-pro',
   'gemini-2.5-flash': 'gemini-2.5-flash',
 }
