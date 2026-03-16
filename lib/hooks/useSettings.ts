@@ -14,7 +14,7 @@ export interface Settings {
 const DEFAULTS: Settings = {
   aiProvider: 'openai',
   aiKeys: { openai: '', anthropic: '', xai: '', google: '' },
-  modelId: 'gpt-4o-mini',
+  modelId: 'gpt-5-mini' as ModelId,
 }
 
 const STORAGE_KEY = 'nr-settings'

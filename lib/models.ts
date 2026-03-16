@@ -5,9 +5,10 @@ import { google, createGoogleGenerativeAI } from '@ai-sdk/google'
 import type { LanguageModel } from 'ai'
 
 export type ModelId =
+  | 'gpt-5.4'
+  | 'gpt-5-mini'
   | 'gpt-4.1'
-  | 'gpt-4o'
-  | 'gpt-4o-mini'
+  | 'gpt-4.1-mini'
   | 'claude-opus-4-6'
   | 'claude-sonnet-4-6'
   | 'claude-haiku-4-5'
@@ -27,9 +28,10 @@ export interface ModelMeta {
 }
 
 export const MODEL_META: ModelMeta[] = [
+  { id: 'gpt-5.4',           label: 'GPT-5.4',             provider: 'openai',    tier: 'smart' },
+  { id: 'gpt-5-mini',        label: 'GPT-5 Mini',          provider: 'openai',    tier: 'fast'  },
   { id: 'gpt-4.1',           label: 'GPT-4.1',             provider: 'openai',    tier: 'smart' },
-  { id: 'gpt-4o',            label: 'GPT-4o',              provider: 'openai',    tier: 'smart' },
-  { id: 'gpt-4o-mini',       label: 'GPT-4o Mini',         provider: 'openai',    tier: 'fast'  },
+  { id: 'gpt-4.1-mini',      label: 'GPT-4.1 Mini',        provider: 'openai',    tier: 'fast'  },
   { id: 'claude-opus-4-6',   label: 'Claude Opus 4.6',     provider: 'anthropic', tier: 'smart' },
   { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6',   provider: 'anthropic', tier: 'smart' },
   { id: 'claude-haiku-4-5',  label: 'Claude Haiku 4.5',    provider: 'anthropic', tier: 'fast'  },
@@ -46,9 +48,10 @@ export const MODEL_META: ModelMeta[] = [
 //   OPENAI_API_KEY, ANTHROPIC_API_KEY, XAI_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY
 export function getModel(id: ModelId): LanguageModel {
   switch (id) {
+    case 'gpt-5.4':           return openai('gpt-5.4')
+    case 'gpt-5-mini':        return openai('gpt-5-mini')
     case 'gpt-4.1':           return openai('gpt-4.1')
-    case 'gpt-4o':            return openai('gpt-4o')
-    case 'gpt-4o-mini':       return openai('gpt-4o-mini')
+    case 'gpt-4.1-mini':      return openai('gpt-4.1-mini')
     case 'claude-opus-4-6':   return anthropic('claude-opus-4-6')
     case 'claude-sonnet-4-6': return anthropic('claude-sonnet-4-6')
     case 'claude-haiku-4-5':  return anthropic('claude-haiku-4-5-20251001')
@@ -61,13 +64,14 @@ export function getModel(id: ModelId): LanguageModel {
   }
 }
 
-export const DEFAULT_MODEL: ModelId = 'gpt-4o-mini'
+export const DEFAULT_MODEL: ModelId = 'gpt-5-mini'
 
 // Maps a ModelId to the provider-specific string used by each SDK
 const MODEL_SDK_ID: Record<ModelId, string> = {
+  'gpt-5.4':           'gpt-5.4',
+  'gpt-5-mini':        'gpt-5-mini',
   'gpt-4.1':           'gpt-4.1',
-  'gpt-4o':            'gpt-4o',
-  'gpt-4o-mini':       'gpt-4o-mini',
+  'gpt-4.1-mini':      'gpt-4.1-mini',
   'claude-opus-4-6':   'claude-opus-4-6',
   'claude-sonnet-4-6': 'claude-sonnet-4-6',
   'claude-haiku-4-5':  'claude-haiku-4-5-20251001',
