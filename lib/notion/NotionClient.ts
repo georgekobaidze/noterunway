@@ -139,11 +139,11 @@ export class NotionClient {
     return blocks
   }
 
-  // Fetch a plain-text snippet from a page's top-level blocks (shallow, fast).
-  // Returns at most `maxChars` characters of content, or empty string on failure.
-  // Returns a text snippet from top-level blocks plus whether ANY blocks exist.
-  // hasAnyBlocks distinguishes truly empty pages from folder-style pages (child_page
-  // blocks have no rich_text but still count as content).
+  // Fetch a plain-text snippet and metadata from a page's top-level blocks (shallow, fast).
+  // Returns at most `maxChars` characters of content in `snippet`, plus `hasAnyBlocks`
+  // indicating whether ANY blocks exist. `hasAnyBlocks` distinguishes truly empty pages
+  // from folder-style pages where child_page blocks have no rich_text but still count
+  // as content.
   async getPageSnippetWithMeta(
     pageId: string,
     maxChars = 500
