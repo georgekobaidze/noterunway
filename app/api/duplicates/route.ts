@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { generateObject } from 'ai'
 import { z } from 'zod'
 import { NotionClient } from '@/lib/notion/NotionClient'
-import { getModelWithKey } from '@/lib/models'
+import { getModelWithKey, MODEL_META, DEFAULT_MODEL } from '@/lib/models'
 import type { ModelId } from '@/lib/models'
 
 function getNotionToken(req: NextRequest): string | null {
@@ -59,7 +59,10 @@ export async function GET(req: NextRequest) {
   }
 
   const aiKey = req.headers.get('x-ai-key')
-  const modelId = (req.headers.get('x-ai-model') ?? 'gpt-4o-mini') as ModelId
+  const requestedModel = req.headers.get('x-ai-model')
+  const modelId: ModelId = (requestedModel && MODEL_META.some((m) => m.id === requestedModel))
+    ? requestedModel as ModelId
+    : DEFAULT_MODEL
   if (!aiKey) {
     return NextResponse.json({ error: 'missing_ai_key' }, { status: 400 })
   }
