@@ -7,6 +7,22 @@ import type {
 
 export type NotionPage = PageObjectResponse
 
+export type ArchiveFeature = 'duplicates' | 'garbage' | 'ask'
+
+export interface ArchiveFolderIds {
+  root: string
+  duplicates: string
+  garbage: string
+  ask: string
+}
+
+const ARCHIVE_ROOT_TITLE = 'NoteRunway Archive'
+const ARCHIVE_FOLDER_TITLES: Record<ArchiveFeature, string> = {
+  duplicates: 'Duplicates',
+  garbage:    'Garbage Collection',
+  ask:        'Semantic Ask',
+}
+
 // Cache of all pages per Notion client instance to avoid redundant pagination.
 // WeakMap is used so that entries do not prevent garbage collection of client instances.
 const allPagesCache: WeakMap<object, NotionPage[]> = new WeakMap()
@@ -121,6 +137,57 @@ export class NotionClient {
     }
 
     return blocks
+  }
+
+  // Fetch a plain-text snippet from a page's top-level blocks (shallow, fast).
+  // Returns at most `maxChars` characters of content, or empty string on failure.
+  async getPageTextSnippet(pageId: string, maxChars = 500): Promise<string> {
+    try {
+      const res = await this.client.blocks.children.list({
+        block_id: pageId,
+        page_size: 30,
+      })
+      const texts: string[] = []
+      for (const block of res.results) {
+        if (!('type' in block)) continue
+        const b = block as BlockObjectResponse
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const inner = (b as any)[b.type] as { rich_text?: Array<{ plain_text: string }> } | undefined
+        if (inner?.rich_text && Array.isArray(inner.rich_text)) {
+          const text = inner.rich_text.map((t) => t.plain_text ?? '').join('')
+          if (text.trim()) texts.push(text.trim())
+        }
+      }
+      const snippet = texts.join(' ')
+      return snippet.length > maxChars ? snippet.slice(0, maxChars) + '…' : snippet
+    } catch {
+      return ''
+    }
+  }
+
+  // Like getPageTextSnippet but also returns whether the page has ANY blocks at all
+  // (including child_page blocks which have no rich_text).
+  // Used to distinguish truly empty pages from folder-style pages.
+  async getPageSnippetWithMeta(
+    pageId: string,
+    maxChars = 500
+  ): Promise<{ snippet: string; hasAnyBlocks: boolean }> {
+    try {
+      const [res, snippet] = await Promise.all([
+        this.client.blocks.children.list({
+          block_id: pageId,
+          page_size: 30,
+        }),
+        this.getPageTextSnippet(pageId, maxChars),
+      ])
+
+      return {
+        snippet,
+        hasAnyBlocks: res.results.length > 0,
+      }
+    } catch {
+      return { snippet: '', hasAnyBlocks: false }
+    }
   }
 
   // Soft-delete (archive) a page
@@ -273,6 +340,288 @@ export class NotionClient {
     }
 
     return emptyCount
+  }
+
+  // ─── Archive folder management ──────────────────────────────────────────────
+
+  // Ensures the NoteRunway Archive folder structure exists in the workspace.
+  // Creates root + feature subfolders if any are missing. Safe to call repeatedly.
+  async ensureArchiveStructure(): Promise<ArchiveFolderIds> {
+    const rootId = await this.findOrCreateWorkspacePage(ARCHIVE_ROOT_TITLE)
+
+    const folderIds = {} as Record<ArchiveFeature, string>
+    for (const feature of ['duplicates', 'garbage', 'ask'] as ArchiveFeature[]) {
+      folderIds[feature] = await this.findOrCreateChildPage(rootId, ARCHIVE_FOLDER_TITLES[feature])
+    }
+
+    return { root: rootId, ...folderIds }
+  }
+
+  // Moves a page to the archive folder for the given feature by:
+  // 1. Creating an audit stub page in the feature subfolder
+  // 2. Archiving (soft-deleting) the original page to Notion Trash
+  // NOTE: Notion API does not support re-parenting existing pages, so the
+  // stub acts as an audit record while the original goes to Trash.
+  async moveToArchive(
+    pageId: string,
+    feature: ArchiveFeature,
+    meta?: { title?: string; reason?: string; keepTitle?: string }
+  ): Promise<void> {
+    const ids = await this.ensureArchiveStructure()
+    const folderId = ids[feature]
+    const date = new Date().toLocaleDateString('en-US', {
+      year: 'numeric', month: 'long', day: 'numeric',
+    })
+    const stubTitle = meta?.title ?? `Archived page (${pageId})`
+
+    // Fetch original content before archiving so we can preserve it in the stub
+    const originalBlocks = await this.fetchCopyableBlocks(pageId)
+
+    // Build body blocks for the stub
+    const bodyBlocks: Parameters<typeof this.client.blocks.children.append>[0]['children'] = [
+      {
+        type: 'callout',
+        callout: {
+          icon: { type: 'emoji', emoji: '🗂️' },
+          rich_text: [{ type: 'text', text: { content: `Archived by NoteRunway · ${date}` } }],
+          color: 'gray_background',
+        },
+      },
+    ]
+
+    if (meta?.reason) {
+      bodyBlocks.push({
+        type: 'paragraph',
+        paragraph: {
+          rich_text: [
+            { type: 'text', text: { content: 'Reason: ' }, annotations: { bold: true } },
+            { type: 'text', text: { content: meta.reason } },
+          ],
+        },
+      })
+    }
+
+    if (meta?.keepTitle) {
+      bodyBlocks.push({
+        type: 'paragraph',
+        paragraph: {
+          rich_text: [
+            { type: 'text', text: { content: 'Kept version: ' }, annotations: { bold: true } },
+            { type: 'text', text: { content: meta.keepTitle } },
+          ],
+        },
+      })
+    }
+
+    bodyBlocks.push({
+      type: 'paragraph',
+      paragraph: {
+        rich_text: [
+          {
+            type: 'text',
+            text: { content: 'To restore: find the original page in Notion\'s Trash (sidebar → Trash).' },
+            annotations: { italic: true, color: 'gray' },
+          },
+        ],
+      },
+    })
+
+    // Separator before original content
+    if (originalBlocks.length > 0) {
+      bodyBlocks.push({ type: 'divider', divider: {} })
+      bodyBlocks.push({
+        type: 'heading_3',
+        heading_3: {
+          rich_text: [{ type: 'text', text: { content: 'Original Content' } }],
+          is_toggleable: false,
+          color: 'default',
+        },
+      })
+    }
+
+    // Notion pages.create supports up to 100 children; include first batch inline
+    const INLINE_LIMIT = 94 // leave headroom for the meta blocks above
+    const inlineBlocks = originalBlocks.slice(0, INLINE_LIMIT)
+    const overflowBlocks = originalBlocks.slice(INLINE_LIMIT)
+
+    try {
+      const stubPage = await this.client.pages.create({
+        parent: { page_id: folderId },
+        properties: {
+          title: { title: [{ type: 'text', text: { content: stubTitle } }] },
+        },
+        children: [...bodyBlocks, ...inlineBlocks],
+      })
+
+      // Append any blocks beyond the inline limit
+      if (overflowBlocks.length > 0) {
+        const BATCH = 100
+        for (let i = 0; i < overflowBlocks.length; i += BATCH) {
+          await this.client.blocks.children.append({
+            block_id: stubPage.id,
+            children: overflowBlocks.slice(i, i + BATCH),
+          })
+        }
+      }
+    } catch {
+      // Non-fatal — still archive the original even if stub creation fails
+    }
+
+    await this.archivePage(pageId)
+  }
+
+  // Fetches a page's blocks and returns them as appendable request objects.
+  // Only copies block types whose content can be faithfully reconstructed.
+  private async fetchCopyableBlocks(
+    pageId: string
+  ): Promise<Parameters<typeof this.client.blocks.children.append>[0]['children']> {
+    type AppendBlock = Parameters<typeof this.client.blocks.children.append>[0]['children'][number]
+    const result: AppendBlock[] = []
+    try {
+      let cursor: string | undefined
+      do {
+        const res = await this.client.blocks.children.list({
+          block_id: pageId,
+          page_size: 100,
+          ...(cursor ? { start_cursor: cursor } : {}),
+        })
+        for (const block of res.results) {
+          if (!('type' in block)) continue
+          const b = block as BlockObjectResponse
+          const copied = this.copyBlock(b)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          if (copied) result.push(copied as any)
+        }
+        cursor = res.has_more ? res.next_cursor ?? undefined : undefined
+      } while (cursor)
+    } catch {
+      // Best-effort — return whatever we managed to fetch
+    }
+    return result
+  }
+
+  // Converts a BlockObjectResponse into an appendable block request.
+  // Returns null for unsupported or non-copyable block types.
+  private copyBlock(b: BlockObjectResponse): Record<string, unknown> | null {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const inner = (b as any)[b.type]
+    if (!inner) return null
+
+    // Block types with rich_text arrays that copy directly
+    const richTextTypes = [
+      'paragraph', 'heading_1', 'heading_2', 'heading_3',
+      'bulleted_list_item', 'numbered_list_item', 'to_do',
+      'quote', 'callout', 'toggle', 'code',
+    ]
+    if (richTextTypes.includes(b.type)) {
+      return { type: b.type, [b.type]: { ...inner, children: undefined } }
+    }
+
+    if (b.type === 'divider') return { type: 'divider', divider: {} }
+
+    if (b.type === 'image') {
+      const url = inner.type === 'external' ? inner.external?.url : inner.file?.url
+      if (url) return { type: 'image', image: { type: 'external', external: { url } } }
+    }
+
+    if (b.type === 'bookmark') {
+      if (inner.url) return { type: 'bookmark', bookmark: { url: inner.url } }
+    }
+
+    if (b.type === 'embed') {
+      if (inner.url) return { type: 'embed', embed: { url: inner.url } }
+    }
+
+    return null
+  }
+
+  // Searches for a workspace-level page by exact title. Returns its ID or null.
+  private async findWorkspacePageByTitle(title: string): Promise<string | null> {
+    try {
+      const res = await this.client.search({
+        query: title,
+        filter: { property: 'object', value: 'page' },
+        page_size: 20,
+      })
+      for (const result of res.results) {
+        if (!isFullPage(result)) continue
+        const titleProp = Object.values(result.properties).find(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (prop: any) => prop && typeof prop === 'object' && prop.type === 'title',
+        )
+        const pageTitle =
+          titleProp && Array.isArray(titleProp.title)
+            ? titleProp.title.map((t: { plain_text: string }) => t.plain_text).join('').trim()
+            : ''
+        if (pageTitle === title) return result.id
+      }
+      return null
+    } catch {
+      return null
+    }
+  }
+
+  // Searches for a child page with the given title inside a parent page.
+  private async findChildPageByTitle(parentId: string, title: string): Promise<string | null> {
+    try {
+      let cursor: string | undefined
+      do {
+        const res = await this.client.blocks.children.list({
+          block_id: parentId,
+          start_cursor: cursor,
+          page_size: 100,
+        })
+        for (const block of res.results) {
+          if (!('type' in block)) continue
+          const b = block as BlockObjectResponse
+          if (b.type === 'child_page') {
+            const cp = b as unknown as { child_page: { title: string } }
+            if (cp.child_page.title === title) return b.id
+          }
+        }
+        cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined
+      } while (cursor)
+      return null
+    } catch {
+      return null
+    }
+  }
+
+  // Finds a workspace-level page by title, creating it if it doesn't exist.
+  private async findOrCreateWorkspacePage(title: string): Promise<string> {
+    const existing = await this.findWorkspacePageByTitle(title)
+    if (existing) return existing
+
+    try {
+      const page = await this.client.pages.create({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        parent: { workspace: true } as any,
+        properties: {
+          title: { title: [{ type: 'text', text: { content: title } }] },
+        },
+      })
+      return page.id
+    } catch (err) {
+      throw this.handleError(err)
+    }
+  }
+
+  // Finds a child page by title inside a parent, creating it if it doesn't exist.
+  private async findOrCreateChildPage(parentId: string, title: string): Promise<string> {
+    const existing = await this.findChildPageByTitle(parentId, title)
+    if (existing) return existing
+
+    try {
+      const page = await this.client.pages.create({
+        parent: { page_id: parentId },
+        properties: {
+          title: { title: [{ type: 'text', text: { content: title } }] },
+        },
+      })
+      return page.id
+    } catch (err) {
+      throw this.handleError(err)
+    }
   }
 
   private handleError(err: unknown): NotionError {

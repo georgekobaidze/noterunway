@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { NotionClient } from '@/lib/notion/NotionClient'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -44,6 +45,15 @@ export async function GET(req: NextRequest) {
   }
 
   const { access_token, workspace_name, workspace_id } = await tokenRes.json()
+
+  // Pre-create the NoteRunway Archive folder structure in the user's workspace.
+  // Best-effort — don't block the OAuth flow if this fails.
+  try {
+    const notion = new NotionClient(access_token)
+    await notion.ensureArchiveStructure()
+  } catch {
+    // non-fatal — folders will be created on first use if this fails
+  }
 
   // Store token in httpOnly cookie — never exposed to JavaScript
   const response = NextResponse.redirect(new URL('/settings?connected=true', req.url))
