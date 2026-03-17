@@ -173,24 +173,16 @@ export class NotionClient {
     maxChars = 500
   ): Promise<{ snippet: string; hasAnyBlocks: boolean }> {
     try {
-      const res = await this.client.blocks.children.list({
-        block_id: pageId,
-        page_size: 30,
-      })
-      const texts: string[] = []
-      for (const block of res.results) {
-        if (!('type' in block)) continue
-        const b = block as BlockObjectResponse
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const inner = (b as any)[b.type] as { rich_text?: Array<{ plain_text: string }> } | undefined
-        if (inner?.rich_text && Array.isArray(inner.rich_text)) {
-          const text = inner.rich_text.map((t) => t.plain_text ?? '').join('')
-          if (text.trim()) texts.push(text.trim())
-        }
-      }
-      const snippet = texts.join(' ')
+      const [res, snippet] = await Promise.all([
+        this.client.blocks.children.list({
+          block_id: pageId,
+          page_size: 30,
+        }),
+        this.getPageTextSnippet(pageId, maxChars),
+      ])
+
       return {
-        snippet: snippet.length > maxChars ? snippet.slice(0, maxChars) + '…' : snippet,
+        snippet,
         hasAnyBlocks: res.results.length > 0,
       }
     } catch {
