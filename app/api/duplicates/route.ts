@@ -155,9 +155,9 @@ export async function GET(req: NextRequest) {
       temperature: 0,
     })
 
-    // Post-process: clamp similarity to [0, 1], filter single-page groups, and enforce minimum confidence
+    // Post-process: clamp similarity to [0.75, 1] and filter groups that don't meet the threshold
     const validGroups = object.groups
-      .map((g) => ({ ...g, similarity: Math.min(1, Math.max(0, g.similarity)) }))
+      .map((g) => ({ ...g, similarity: Math.min(1, Math.max(0.75, g.similarity)) }))
       .filter((g) => g.pages.length >= 2 && g.similarity >= 0.75)
 
     return NextResponse.json({
