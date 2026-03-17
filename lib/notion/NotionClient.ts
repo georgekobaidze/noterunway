@@ -545,10 +545,13 @@ export class NotionClient {
       })
       for (const result of res.results) {
         if (!isFullPage(result)) continue
-        const titleProp = result.properties['title'] ?? result.properties['Name']
+        const titleProp = Object.values(result.properties).find(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (prop: any) => prop && typeof prop === 'object' && prop.type === 'title',
+        )
         const pageTitle =
-          titleProp?.type === 'title'
-            ? titleProp.title.map((t) => t.plain_text).join('').trim()
+          titleProp && Array.isArray(titleProp.title)
+            ? titleProp.title.map((t: { plain_text: string }) => t.plain_text).join('').trim()
             : ''
         if (pageTitle === title) return result.id
       }
