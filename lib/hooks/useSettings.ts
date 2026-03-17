@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import type { ModelId } from '@/lib/models'
+import { MODEL_META, DEFAULT_MODEL, type ModelId } from '@/lib/models'
 
 export type Provider = 'openai' | 'anthropic' | 'xai' | 'google'
 
@@ -14,7 +14,7 @@ export interface Settings {
 const DEFAULTS: Settings = {
   aiProvider: 'openai',
   aiKeys: { openai: '', anthropic: '', xai: '', google: '' },
-  modelId: 'gpt-5-mini' as ModelId,
+  modelId: DEFAULT_MODEL,
 }
 
 const STORAGE_KEY = 'nr-settings'
@@ -34,7 +34,13 @@ export function useSettings() {
           parsed.aiKeys = { ...DEFAULTS.aiKeys, [provider]: parsed.aiKey }
           delete parsed.aiKey
         }
-        setSettings({ ...DEFAULTS, ...parsed, aiKeys: { ...DEFAULTS.aiKeys, ...parsed.aiKeys } })
+        setSettings({
+          ...DEFAULTS,
+          ...parsed,
+          aiKeys: { ...DEFAULTS.aiKeys, ...parsed.aiKeys },
+          // Reset to default if persisted modelId is no longer valid (e.g. model was removed)
+          modelId: MODEL_META.some((m) => m.id === parsed.modelId) ? parsed.modelId : DEFAULT_MODEL,
+        })
       }
     } catch {
       // ignore parse errors
