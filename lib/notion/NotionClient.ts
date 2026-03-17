@@ -139,9 +139,15 @@ export class NotionClient {
     return blocks
   }
 
-  // Fetch a plain-text snippet from a page's top-level blocks (shallow, fast).
-  // Returns at most `maxChars` characters of content, or empty string on failure.
-  async getPageTextSnippet(pageId: string, maxChars = 500): Promise<string> {
+  // Fetch a plain-text snippet and metadata from a page's top-level blocks (shallow, fast).
+  // Returns at most `maxChars` characters of content in `snippet`, plus `hasAnyBlocks`
+  // indicating whether ANY blocks exist. `hasAnyBlocks` distinguishes truly empty pages
+  // from folder-style pages where child_page blocks have no rich_text but still count
+  // as content.
+  async getPageSnippetWithMeta(
+    pageId: string,
+    maxChars = 500
+  ): Promise<{ snippet: string; hasAnyBlocks: boolean }> {
     try {
       const res = await this.client.blocks.children.list({
         block_id: pageId,
@@ -159,30 +165,8 @@ export class NotionClient {
         }
       }
       const snippet = texts.join(' ')
-      return snippet.length > maxChars ? snippet.slice(0, maxChars) + '…' : snippet
-    } catch {
-      return ''
-    }
-  }
-
-  // Like getPageTextSnippet but also returns whether the page has ANY blocks at all
-  // (including child_page blocks which have no rich_text).
-  // Used to distinguish truly empty pages from folder-style pages.
-  async getPageSnippetWithMeta(
-    pageId: string,
-    maxChars = 500
-  ): Promise<{ snippet: string; hasAnyBlocks: boolean }> {
-    try {
-      const [res, snippet] = await Promise.all([
-        this.client.blocks.children.list({
-          block_id: pageId,
-          page_size: 30,
-        }),
-        this.getPageTextSnippet(pageId, maxChars),
-      ])
-
       return {
-        snippet,
+        snippet: snippet.length > maxChars ? snippet.slice(0, maxChars) + '…' : snippet,
         hasAnyBlocks: res.results.length > 0,
       }
     } catch {
