@@ -59,9 +59,17 @@ function GroupCard({ group, onArchive, onSkip, archiving, archived }: GroupCardP
           const isKeep = page.id === selectedKeepId
           const isSuggested = page.id === group.suggestedKeepId
           return (
-            <button
+            <div
               key={page.id}
+              role="button"
+              tabIndex={0}
               onClick={() => setSelectedKeepId(page.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  setSelectedKeepId(page.id)
+                }
+              }}
               className={`w-full text-left px-5 py-4 flex items-start gap-3 transition-colors ${
                 isKeep ? 'bg-emerald-400/5' : 'hover:bg-white/[0.02]'
               }`}
@@ -105,7 +113,7 @@ function GroupCard({ group, onArchive, onSkip, archiving, archived }: GroupCardP
               {!isKeep && (
                 <span className="text-[10px] font-mono text-red-400/60 mt-0.5 flex-shrink-0">archive</span>
               )}
-            </button>
+            </div>
           )
         })}
       </div>
