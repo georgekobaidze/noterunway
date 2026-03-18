@@ -63,6 +63,23 @@ export interface GarbageScanResult {
   }
 }
 
+export interface DeadLink {
+  sourcePageId: string
+  sourcePageTitle: string
+  brokenTargetId: string
+  brokenTargetTitle: string | null  // null if the page is hard-deleted and unresolvable
+}
+
+export interface DeadLinkScanResult {
+  deadLinks: DeadLink[]
+  stats: {
+    totalPages: number
+    scannedPages: number
+    archiveExcluded: number
+    deadLinkCount: number
+  }
+}
+
 export class NotionError extends Error {
   constructor(
     message: string,
@@ -316,6 +333,124 @@ export class NotionClient {
     }
 
     return Math.round((mentionedIds.size / pages.length) * 100) / 100
+  }
+
+  // Scan all pages for @mentions pointing to pages that no longer exist in the workspace.
+  // A mention is "dead" if its target page ID is not in the workspace page list.
+  // Archive pages are excluded from scanning (they're expected to have broken links).
+  async getDeadLinks(): Promise<DeadLinkScanResult> {
+    const pages = await getOrFetchAllPages(this)
+    const pageIds = new Set(pages.map((p) => p.id))
+
+    function getTitle(page: NotionPage): string {
+      const titleEntry = Object.values(page.properties).find((prop) => prop.type === 'title')
+      return titleEntry?.type === 'title'
+        ? titleEntry.title.map((t: { plain_text: string }) => t.plain_text).join('').trim()
+        : ''
+    }
+
+    const archiveRootId = pages.find((p) => getTitle(p) === ARCHIVE_ROOT_TITLE)?.id ?? null
+    const parentById = new Map(
+      pages.map((p) => [p.id, p.parent.type === 'page_id' ? p.parent.page_id : null])
+    )
+
+    function isInsideArchive(id: string): boolean {
+      if (!archiveRootId) return false
+      const visited = new Set<string>()
+      let current: string | null = id
+      while (current) {
+        if (visited.has(current)) return false
+        visited.add(current)
+        const pid: string | null = parentById.get(current) ?? null
+        if (pid === archiveRootId) return true
+        current = pid
+      }
+      return false
+    }
+
+    const candidates = pages.filter((p) => p.id !== archiveRootId && !isInsideArchive(p.id))
+    const archiveExcluded = pages.length - candidates.length
+
+    const deadLinks: DeadLink[] = []
+    const BATCH = 10
+
+    for (let i = 0; i < candidates.length; i += BATCH) {
+      const batch = candidates.slice(i, i + BATCH)
+      await Promise.all(
+        batch.map(async (page) => {
+          const sourceTitle = getTitle(page)
+          try {
+            let cursor: string | undefined
+            do {
+              const res = await this.client.blocks.children.list({
+                block_id: page.id,
+                start_cursor: cursor,
+                page_size: 100,
+              })
+              for (const block of res.results) {
+                if (!('type' in block)) continue
+                const richTexts = getRichTexts(block as BlockObjectResponse)
+                for (const rt of richTexts) {
+                  if (rt.type === 'mention' && rt.mention.type === 'page') {
+                    const targetId = rt.mention.page.id
+                    if (!pageIds.has(targetId)) {
+                      // Only add once per source→target pair
+                      const alreadyAdded = deadLinks.some(
+                        (dl) => dl.sourcePageId === page.id && dl.brokenTargetId === targetId
+                      )
+                      if (!alreadyAdded) {
+                        deadLinks.push({
+                          sourcePageId: page.id,
+                          sourcePageTitle: sourceTitle,
+                          brokenTargetId: targetId,
+                          brokenTargetTitle: null,
+                        })
+                      }
+                    }
+                  }
+                }
+              }
+              cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined
+            } while (cursor)
+          } catch {
+            // skip inaccessible pages
+          }
+        })
+      )
+    }
+
+    // Attempt to resolve titles for broken targets — archived pages are still fetchable.
+    // Hard-deleted pages return 404 and stay null.
+    const uniqueTargetIds = [...new Set(deadLinks.map((dl) => dl.brokenTargetId))]
+    const resolvedTitles = new Map<string, string | null>()
+    await Promise.all(
+      uniqueTargetIds.map(async (targetId) => {
+        try {
+          const page = await this.client.pages.retrieve({ page_id: targetId })
+          if (isFullPage(page)) {
+            resolvedTitles.set(targetId, getTitle(page) || '(untitled)')
+          } else {
+            resolvedTitles.set(targetId, null)
+          }
+        } catch {
+          resolvedTitles.set(targetId, null)
+        }
+      })
+    )
+
+    for (const dl of deadLinks) {
+      dl.brokenTargetTitle = resolvedTitles.get(dl.brokenTargetId) ?? null
+    }
+
+    return {
+      deadLinks,
+      stats: {
+        totalPages: pages.length,
+        scannedPages: candidates.length,
+        archiveExcluded,
+        deadLinkCount: deadLinks.length,
+      },
+    }
   }
 
   // Count pages with no content blocks. Batches requests to avoid rate limits.
