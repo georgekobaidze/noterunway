@@ -134,7 +134,7 @@ export default function DeadLinksPage() {
             Dead Link Detector
           </h1>
           <p className="text-muted-foreground text-sm">
-            Scans every page for <span className="text-foreground">@mentions</span> pointing to pages that no longer exist in your workspace.
+            Scans each page&apos;s top-level content for <span className="text-foreground">@mentions</span> pointing to pages that no longer exist in your workspace.
           </p>
         </div>
 
