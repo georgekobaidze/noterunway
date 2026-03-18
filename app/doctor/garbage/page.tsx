@@ -121,6 +121,7 @@ function PageRow({
         rel="noopener noreferrer"
         onClick={(e) => e.stopPropagation()}
         className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-[#00d4ff] transition-colors flex-shrink-0"
+        aria-label={page.title ? `Open "${page.title}" in Notion` : 'Open page in Notion'}
       >
         <ExternalLink size={10} />
       </a>
