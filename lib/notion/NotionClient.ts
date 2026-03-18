@@ -423,20 +423,24 @@ export class NotionClient {
     // Hard-deleted pages return 404 and stay null.
     const uniqueTargetIds = [...new Set(deadLinks.map((dl) => dl.brokenTargetId))]
     const resolvedTitles = new Map<string, string | null>()
-    await Promise.all(
-      uniqueTargetIds.map(async (targetId) => {
-        try {
-          const page = await this.client.pages.retrieve({ page_id: targetId })
-          if (isFullPage(page)) {
-            resolvedTitles.set(targetId, getTitle(page) || '(untitled)')
-          } else {
+    // Batch requests to avoid unbounded concurrency and hitting Notion rate limits.
+    for (let i = 0; i < uniqueTargetIds.length; i += BATCH) {
+      const batch = uniqueTargetIds.slice(i, i + BATCH)
+      await Promise.all(
+        batch.map(async (targetId) => {
+          try {
+            const page = await this.client.pages.retrieve({ page_id: targetId })
+            if (isFullPage(page)) {
+              resolvedTitles.set(targetId, getTitle(page) || '(untitled)')
+            } else {
+              resolvedTitles.set(targetId, null)
+            }
+          } catch {
             resolvedTitles.set(targetId, null)
           }
-        } catch {
-          resolvedTitles.set(targetId, null)
-        }
-      })
-    )
+        })
+      )
+    }
 
     for (const dl of deadLinks) {
       dl.brokenTargetTitle = resolvedTitles.get(dl.brokenTargetId) ?? null
