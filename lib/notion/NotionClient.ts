@@ -520,7 +520,7 @@ export class NotionClient {
         rich_text: [
           {
             type: 'text',
-            text: { content: 'To restore: find the original page in Notion\'s Trash (sidebar → Trash).' },
+            text: { content: 'The original content is preserved below. To restore manually, copy the content back into a new page.' },
             annotations: { italic: true, color: 'gray' },
           },
         ],
