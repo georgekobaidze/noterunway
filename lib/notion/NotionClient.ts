@@ -376,6 +376,7 @@ export class NotionClient {
 
     for (let i = 0; i < candidates.length; i += BATCH) {
       const batch = candidates.slice(i, i + BATCH)
+      const seenDeadLinkPairs = new Set<string>()
       await Promise.all(
         batch.map(async (page) => {
           const sourceTitle = getTitle(page)
@@ -395,10 +396,9 @@ export class NotionClient {
                     const targetId = rt.mention.page.id
                     if (!pageIds.has(targetId)) {
                       // Only add once per source→target pair
-                      const alreadyAdded = deadLinks.some(
-                        (dl) => dl.sourcePageId === page.id && dl.brokenTargetId === targetId
-                      )
-                      if (!alreadyAdded) {
+                      const pairKey = `${page.id}:${targetId}`
+                      if (!seenDeadLinkPairs.has(pairKey)) {
+                        seenDeadLinkPairs.add(pairKey)
                         deadLinks.push({
                           sourcePageId: page.id,
                           sourcePageTitle: sourceTitle,
