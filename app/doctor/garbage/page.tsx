@@ -84,7 +84,8 @@ function PageRow({
 
   return (
     <div
-      role="button"
+      role="checkbox"
+      aria-checked={selected}
       tabIndex={0}
       onClick={() => onToggle(page.id)}
       onKeyDown={(e) => {
