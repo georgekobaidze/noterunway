@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Navbar } from '@/components/Navbar'
 import { CyberLoader } from '@/components/CyberLoader'
-import { GitMerge, Trash2, Network, Database, Sparkles, AlertTriangle, RefreshCw, ScanSearch } from 'lucide-react'
+import { GitMerge, Trash2, Network, Database, Sparkles, AlertTriangle, RefreshCw, ScanSearch, Link2Off } from 'lucide-react'
 import type { WorkspaceStats } from '@/lib/notion/NotionClient'
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
@@ -59,7 +59,7 @@ interface FeatureLinkProps {
   icon: React.ReactNode
   title: string
   description: string
-  tag: string
+  tag?: string
 }
 
 function FeatureLink({ href, icon, title, description, tag }: FeatureLinkProps) {
@@ -70,9 +70,9 @@ function FeatureLink({ href, icon, title, description, tag }: FeatureLinkProps) 
     >
       <div className="flex items-start justify-between">
         <div className="text-[#00d4ff] group-hover:scale-110 transition-transform">{icon}</div>
-        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-[#00d4ff]/20 text-[#00d4ff]/60 tracking-widest uppercase">
+        {tag && <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-[#00d4ff]/20 text-[#00d4ff]/60 tracking-widest uppercase">
           {tag}
-        </span>
+        </span>}
       </div>
       <div>
         <p className="font-semibold text-sm text-foreground group-hover:text-[#00d4ff] transition-colors">{title}</p>
@@ -280,7 +280,12 @@ export default function DashboardPage() {
                 icon={<Trash2 size={20} />}
                 title="Garbage Collector"
                 description="Archive empty, orphaned, and stale pages safely."
-                tag="AI"
+              />
+              <FeatureLink
+                href="/doctor/deadlinks"
+                icon={<Link2Off size={20} />}
+                title="Dead Link Detector"
+                description="Find @mentions pointing to deleted or missing pages."
               />
               <FeatureLink
                 href="/graph"
