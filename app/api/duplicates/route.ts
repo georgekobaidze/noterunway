@@ -95,8 +95,14 @@ export async function GET(req: NextRequest) {
     function isInsideArchive(id: string): boolean {
       if (!archiveRootId) return false
       let current: string | null = id
-      for (let i = 0; i < 10; i++) {
-        const pid: string | null = parentById.get(current ?? '') ?? null
+      const visited = new Set<string>()
+      while (current) {
+        if (visited.has(current)) {
+          // Cycle detected; treat as not inside archive to avoid infinite loops.
+          return false
+        }
+        visited.add(current)
+        const pid: string | null = parentById.get(current) ?? null
         if (!pid) return false
         if (pid === archiveRootId) return true
         current = pid
