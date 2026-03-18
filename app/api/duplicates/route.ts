@@ -28,10 +28,10 @@ Hierarchy rule: Each page entry includes a "Parent:" field. If page A is the par
 For each group of duplicates you find:
 - Include ALL versions in "pages" (can be 2 or more)
 - Set "suggestedKeepId" to the most complete/recently edited version
-- Set "similarity" between 0.75 and 1.0 based on how similar they are
+- Set "similarity" between 0.60 and 1.0 based on how similar they are
 - Write a brief "reason" explaining why they are duplicates
 
-Only include groups where you are at least 75% confident. When in doubt, leave it out — false positives are disruptive.`
+Only include groups where you are at least 60% confident. When in doubt, err on the side of inclusion — the user will review your suggestions.`
 
 const duplicatesSchema = z.object({
   reasoning: z.string().describe('Brief summary of what you found across all pages'),
@@ -44,7 +44,7 @@ const duplicatesSchema = z.object({
         })
       ).describe('Must contain at least 2 pages'),
       suggestedKeepId: z.string().describe('ID of the best version to keep'),
-      similarity: z.number().describe('Similarity score between 0.75 and 1.0'),
+      similarity: z.number().describe('Similarity score between 0.60 and 1.0'),
       reason: z.string().describe('One sentence explaining why these are duplicates'),
     })
   ),
@@ -115,7 +115,7 @@ export async function GET(req: NextRequest) {
       const batch = candidates.slice(i, i + BATCH)
       const results = await Promise.all(
         batch.map(async (p) => {
-          const { snippet, hasAnyBlocks } = await notion.getPageSnippetWithMeta(p.id, 400)
+          const { snippet, hasAnyBlocks } = await notion.getPageSnippetWithMeta(p.id, 600)
           // Skip pages with zero blocks — they're truly empty and belong in Garbage Collector.
           // Pages with child_page blocks (folder pages) have hasAnyBlocks=true so they pass through.
           if (!hasAnyBlocks) return null
@@ -155,10 +155,10 @@ export async function GET(req: NextRequest) {
       temperature: 0,
     })
 
-    // Post-process: clamp similarity to [0, 1] and filter groups that don't meet the threshold
+    // Post-process: clamp similarity to [0.6, 1] and filter groups that don't meet the threshold
     const validGroups = object.groups
-      .map((g) => ({ ...g, similarity: Math.min(1, Math.max(0, g.similarity)) }))
-      .filter((g) => g.pages.length >= 2 && g.similarity >= 0.75)
+      .map((g) => ({ ...g, similarity: Math.min(1, Math.max(0.6, g.similarity)) }))
+      .filter((g) => g.pages.length >= 2 && g.similarity >= 0.6)
 
     return NextResponse.json({
       reasoning: object.reasoning,
