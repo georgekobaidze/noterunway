@@ -105,7 +105,7 @@ export default function DeadLinksPage() {
     }
   }
 
-  const grouped = result ? groupBySource(result.deadLinks) : new Map()
+  const grouped = result ? groupBySource(result.deadLinks) : new Map<string, DeadLink[]>()
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
