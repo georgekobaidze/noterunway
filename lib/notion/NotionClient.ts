@@ -44,6 +44,25 @@ export interface WorkspaceStats {
   duplicateCandidates: number
 }
 
+export interface GarbagePage {
+  id: string
+  title: string
+  lastEdited: string
+  parentId: string | null
+  category: 'empty' | 'stale' | 'orphaned'
+}
+
+export interface GarbageScanResult {
+  empty: GarbagePage[]
+  stale: GarbagePage[]
+  orphaned: GarbagePage[]
+  stats: {
+    totalPages: number
+    scannedPages: number
+    archiveExcluded: number
+  }
+}
+
 export class NotionError extends Error {
   constructor(
     message: string,
@@ -326,6 +345,104 @@ export class NotionClient {
     return emptyCount
   }
 
+  // Scan the workspace for garbage pages: orphaned, empty, and stale.
+  // Categories are mutually exclusive: orphaned > empty > stale (priority order).
+  // Archive pages are excluded from all categories.
+  async getGarbagePages(staleDays = 90): Promise<GarbageScanResult> {
+    const pages = await getOrFetchAllPages(this)
+    const allPageIds = new Set(pages.map((p) => p.id))
+
+    function getTitle(page: NotionPage): string {
+      const titleEntry = Object.values(page.properties).find((prop) => prop.type === 'title')
+      return titleEntry?.type === 'title'
+        ? titleEntry.title.map((t: { plain_text: string }) => t.plain_text).join('').trim()
+        : ''
+    }
+
+    const archiveRootId = pages.find((p) => getTitle(p) === ARCHIVE_ROOT_TITLE)?.id ?? null
+    const parentById = new Map(
+      pages.map((p) => [p.id, p.parent.type === 'page_id' ? p.parent.page_id : null])
+    )
+
+    function isInsideArchive(id: string): boolean {
+      if (!archiveRootId) return false
+      let current: string | null = id
+      const visited = new Set<string>()
+      while (current) {
+        if (visited.has(current)) {
+          // Cycle detected; treat as not inside archive to avoid infinite loops.
+          return false
+        }
+        visited.add(current)
+        const pid: string | null = parentById.get(current) ?? null
+        if (!pid) return false
+        if (pid === archiveRootId) return true
+        current = pid
+      }
+      return false
+    }
+
+    const candidates = pages.filter((p) => p.id !== archiveRootId && !isInsideArchive(p.id))
+    const archiveExcluded = pages.length - candidates.length
+
+    // Orphaned: has a parent page_id but that page is not in the workspace
+    // (parent was deleted or archived out of integration scope)
+    const orphanedIds = new Set<string>()
+    for (const p of candidates) {
+      if (p.parent.type === 'page_id' && !allPageIds.has(p.parent.page_id)) {
+        orphanedIds.add(p.id)
+      }
+    }
+
+    // Empty: zero content blocks (skip orphaned pages — already categorised)
+    const nonOrphaned = candidates.filter((p) => !orphanedIds.has(p.id))
+    const emptyIds = new Set<string>()
+    const BATCH = 10
+    for (let i = 0; i < nonOrphaned.length; i += BATCH) {
+      const batch = nonOrphaned.slice(i, i + BATCH)
+      const results = await Promise.all(
+        batch.map(async (page) => {
+          try {
+            const res = await this.client.blocks.children.list({ block_id: page.id, page_size: 1 })
+            return res.results.length === 0 ? page.id : null
+          } catch {
+            return null
+          }
+        })
+      )
+      for (const id of results) {
+        if (id) emptyIds.add(id)
+      }
+    }
+
+    const staleThreshold = Date.now() - staleDays * 24 * 60 * 60 * 1000
+
+    const empty: GarbagePage[] = []
+    const stale: GarbagePage[] = []
+    const orphaned: GarbagePage[] = []
+
+    for (const p of candidates) {
+      const title = getTitle(p)
+      const lastEdited = p.last_edited_time
+      const parentId = p.parent.type === 'page_id' ? p.parent.page_id : null
+
+      if (orphanedIds.has(p.id)) {
+        orphaned.push({ id: p.id, title, lastEdited, parentId, category: 'orphaned' })
+      } else if (emptyIds.has(p.id)) {
+        empty.push({ id: p.id, title, lastEdited, parentId, category: 'empty' })
+      } else if (new Date(lastEdited).getTime() < staleThreshold) {
+        stale.push({ id: p.id, title, lastEdited, parentId, category: 'stale' })
+      }
+    }
+
+    return {
+      empty,
+      stale,
+      orphaned,
+      stats: { totalPages: pages.length, scannedPages: candidates.length, archiveExcluded },
+    }
+  }
+
   // ─── Archive folder management ──────────────────────────────────────────────
 
   // Ensures the NoteRunway Archive folder structure exists in the workspace.
@@ -356,7 +473,7 @@ export class NotionClient {
     const date = new Date().toLocaleDateString('en-US', {
       year: 'numeric', month: 'long', day: 'numeric',
     })
-    const stubTitle = meta?.title ?? `Archived page (${pageId})`
+    const stubTitle = meta?.title ? `${meta.title}` : '(untitled)'
 
     // Fetch original content before archiving so we can preserve it in the stub
     const originalBlocks = await this.fetchCopyableBlocks(pageId)
@@ -532,7 +649,8 @@ export class NotionClient {
         const titleProp = Object.values(result.properties).find(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (prop: any) => prop && typeof prop === 'object' && prop.type === 'title',
-        )
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ) as any
         const pageTitle =
           titleProp && Array.isArray(titleProp.title)
             ? titleProp.title.map((t: { plain_text: string }) => t.plain_text).join('').trim()

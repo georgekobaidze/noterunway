@@ -199,7 +199,7 @@ export async function POST(req: NextRequest) {
       archivePages.map(async ({ id, title }: { id: string; title?: string }) => {
         try {
           await notion.moveToArchive(id, 'duplicates', {
-            title: title || `Archived page (${id})`,
+            title: title || '(untitled)',
             reason: reason ?? 'Identified as duplicate',
             keepTitle,
           })
