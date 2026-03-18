@@ -44,28 +44,32 @@ export async function POST(req: NextRequest) {
     }
 
     const notion = new NotionClient(token)
-    const errors: string[] = []
+    const failedIds = new Set<string>()
+    const concurrency = 5
 
-    await Promise.all(
-      pages.map(async ({ id, title }: { id: string; title: string }) => {
-        try {
-          await notion.moveToArchive(id, 'garbage', {
-            title: title || '(untitled)',
-            reason: reason ?? 'Identified as garbage',
-          })
-        } catch (err) {
-          errors.push(id)
-          console.error(`Failed to archive page ${id}:`, err)
-        }
-      })
-    )
+    for (let i = 0; i < pages.length; i += concurrency) {
+      const batch = pages.slice(i, i + concurrency)
+      await Promise.all(
+        batch.map(async ({ id, title }: { id: string; title: string }) => {
+          try {
+            await notion.moveToArchive(id, 'garbage', {
+              title: title || '(untitled)',
+              reason: reason ?? 'Identified as garbage',
+            })
+          } catch (err) {
+            failedIds.add(id)
+            console.error(`Failed to archive page ${id}:`, err)
+          }
+        })
+      )
+    }
 
     return NextResponse.json({
       success: true,
       archivedIds: pages
-        .filter(({ id }: { id: string }) => !errors.includes(id))
+        .filter(({ id }: { id: string }) => !failedIds.has(id))
         .map(({ id }: { id: string }) => id),
-      failedIds: errors,
+      failedIds: Array.from(failedIds),
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
