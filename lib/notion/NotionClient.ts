@@ -591,7 +591,7 @@ export class NotionClient {
   // Returns all non-archived pages with their full text content concatenated.
   // Used by the deep AI scan to send page text to an LLM.
   async getAllPagesWithText(): Promise<Array<{ pageId: string; pageTitle: string; text: string }>> {
-    const pages = await this.getAllPages()
+    const pages = await this.getOrFetchAllPages()
 
     const parentById = new Map<string, string | null>()
     for (const page of pages) {
