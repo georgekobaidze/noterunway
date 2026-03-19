@@ -536,27 +536,30 @@ export class NotionClient {
           if (rt.type !== 'text' || !rt.text) continue
           const text = rt.text.content
           for (const pattern of SENSITIVE_PATTERNS) {
-            const match = pattern.regex.exec(text)
-            if (!match) continue
-            const raw = match[0]
-            const redacted =
-              raw.length > 12
-                ? `${raw.slice(0, 8)}...${raw.slice(-4)}`
-                : `${raw.slice(0, 4)}...`
-            const alreadyAdded = findings.some(
-              (f) =>
-                f.sourcePageId === page.id &&
-                f.patternName === pattern.name &&
-                f.redactedSnippet === redacted
-            )
-            if (!alreadyAdded) {
-              findings.push({
-                sourcePageId: page.id,
-                sourcePageTitle: pageTitle,
-                patternName: pattern.name,
-                category: pattern.category,
-                redactedSnippet: redacted,
-              })
+            // Ensure global regexes do not carry state across texts
+            pattern.regex.lastIndex = 0
+            let match: RegExpExecArray | null
+            while ((match = pattern.regex.exec(text)) !== null) {
+              const raw = match[0]
+              const redacted =
+                raw.length > 12
+                  ? `${raw.slice(0, 8)}...${raw.slice(-4)}`
+                  : `${raw.slice(0, 4)}...`
+              const alreadyAdded = findings.some(
+                (f) =>
+                  f.sourcePageId === page.id &&
+                  f.patternName === pattern.name &&
+                  f.redactedSnippet === redacted
+              )
+              if (!alreadyAdded) {
+                findings.push({
+                  sourcePageId: page.id,
+                  sourcePageTitle: pageTitle,
+                  patternName: pattern.name,
+                  category: pattern.category,
+                  redactedSnippet: redacted,
+                })
+              }
             }
           }
         }
