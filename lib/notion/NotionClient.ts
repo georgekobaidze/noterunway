@@ -80,6 +80,28 @@ export interface DeadLinkScanResult {
   }
 }
 
+export type SensitiveCategory = 'api_key' | 'credential' | 'pii' | 'crypto'
+
+export interface SensitiveFinding {
+  sourcePageId: string
+  sourcePageTitle: string
+  patternName: string
+  category: SensitiveCategory
+  redactedSnippet: string  // e.g. "sk-proj-T3Bl...wxyz" — enough to confirm, not expose
+}
+
+export interface SensitiveScanResult {
+  findings: SensitiveFinding[]        // regex-detected findings
+  aiFindings: SensitiveFinding[]      // AI-detected findings not caught by regex
+  stats: {
+    totalPages: number
+    scannedPages: number
+    archiveExcluded: number
+    findingCount: number
+    aiFindingCount: number
+  }
+}
+
 export class NotionError extends Error {
   constructor(
     message: string,
@@ -317,8 +339,8 @@ export class NotionClient {
                 // Extract rich text arrays from common block types
                 const richTexts = getRichTexts(b)
                 for (const rt of richTexts) {
-                  if (rt.type === 'mention' && rt.mention.type === 'page') {
-                    const id = rt.mention.page.id
+                  if (rt.type === 'mention' && rt.mention?.type === 'page') {
+                    const id = rt.mention.page!.id
                     if (pageIds.has(id)) mentionedIds.add(id)
                   }
                 }
@@ -392,8 +414,8 @@ export class NotionClient {
                 if (!('type' in block)) continue
                 const richTexts = getRichTexts(block as BlockObjectResponse)
                 for (const rt of richTexts) {
-                  if (rt.type === 'mention' && rt.mention.type === 'page') {
-                    const targetId = rt.mention.page.id
+                  if (rt.type === 'mention' && rt.mention?.type === 'page') {
+                    const targetId = rt.mention.page!.id
                     if (!pageIds.has(targetId)) {
                       // Only add once per source→target pair
                       const pairKey = `${page.id}:${targetId}`
@@ -455,6 +477,180 @@ export class NotionClient {
         deadLinkCount: deadLinks.length,
       },
     }
+  }
+
+  // Scan all workspace pages for sensitive data patterns (API keys, tokens, PII, etc.).
+  // Uses full recursive block traversal so toggles, callouts, and nested content are covered.
+  // Archive pages are excluded. Matches are redacted — only first 8 + last 4 chars shown.
+  async getSensitiveFindings(): Promise<SensitiveScanResult> {
+    const pages = await getOrFetchAllPages(this)
+
+    // Build parent and page lookup maps
+    const parentById = new Map<string, string | null>()
+    const pageById = new Map<string, (typeof pages)[number]>()
+    for (const page of pages) {
+      const p = page.parent
+      const parentId =
+        p.type === 'page_id' ? p.page_id
+        : p.type === 'database_id' ? p.database_id
+        : null
+      parentById.set(page.id, parentId)
+      pageById.set(page.id, page)
+    }
+
+    const titleOf = (page: (typeof pages)[number]): string => {
+      const raw = Object.values(page.properties).find((prop) => prop.type === 'title') as any
+      return raw?.title?.map((t: any) => t.plain_text).join('') || '(untitled)'
+    }
+
+    // Precompute archive root page IDs so we don't repeatedly parse titles
+    const archiveRootIds = new Set<string>()
+    for (const page of pages) {
+      if (titleOf(page) === ARCHIVE_ROOT_TITLE) {
+        archiveRootIds.add(page.id)
+      }
+    }
+
+    const isInsideArchive = (pageId: string): boolean => {
+      const visited = new Set<string>()
+      let current: string | null = pageId
+      while (current) {
+        if (visited.has(current)) break
+        visited.add(current)
+        if (archiveRootIds.has(current)) return true
+        const pg = pageById.get(current)
+        if (!pg) break
+        current = parentById.get(current) ?? null
+      }
+      return false
+    }
+
+    const candidates = pages.filter((p) => !isInsideArchive(p.id))
+    const archiveExcluded = pages.length - candidates.length
+
+    const findings: SensitiveFinding[] = []
+
+    for (const page of candidates) {
+      const pageTitle = titleOf(page)
+      let blocks: BlockObjectResponse[]
+      try {
+        blocks = await this.getPageBlocks(page.id)
+      } catch {
+        continue
+      }
+
+      for (const block of blocks) {
+        const richTexts = getRichTexts(block)
+        for (const rt of richTexts) {
+          if (rt.type !== 'text' || !rt.text) continue
+          const text = rt.text.content
+          for (const pattern of SENSITIVE_PATTERNS) {
+            // Ensure global regexes do not carry state across texts
+            pattern.regex.lastIndex = 0
+            let match: RegExpExecArray | null
+            while ((match = pattern.regex.exec(text)) !== null) {
+              const raw = match[0]
+              const redacted =
+                raw.length > 12
+                  ? `${raw.slice(0, 8)}...${raw.slice(-4)}`
+                  : `${raw.slice(0, 4)}...`
+              const alreadyAdded = findings.some(
+                (f) =>
+                  f.sourcePageId === page.id &&
+                  f.patternName === pattern.name &&
+                  f.redactedSnippet === redacted
+              )
+              if (!alreadyAdded) {
+                findings.push({
+                  sourcePageId: page.id,
+                  sourcePageTitle: pageTitle,
+                  patternName: pattern.name,
+                  category: pattern.category,
+                  redactedSnippet: redacted,
+                })
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return {
+      findings,
+      aiFindings: [],
+      stats: {
+        totalPages: pages.length,
+        scannedPages: candidates.length,
+        archiveExcluded,
+        findingCount: findings.length,
+        aiFindingCount: 0,
+      },
+    }
+  }
+
+  // Returns all non-archived pages with their full text content concatenated.
+  // Used by the deep AI scan to send page text to an LLM.
+  async getAllPagesWithText(): Promise<Array<{ pageId: string; pageTitle: string; text: string }>> {
+    const pages = await this.getOrFetchAllPages()
+
+    const parentById = new Map<string, string | null>()
+    for (const page of pages) {
+      const p = page.parent
+      const parentId =
+        p.type === 'page_id' ? p.page_id
+        : p.type === 'database_id' ? p.database_id
+        : null
+      parentById.set(page.id, parentId)
+    }
+
+    const titleOf = (page: (typeof pages)[number]): string => {
+      const raw = Object.values(page.properties).find((prop) => prop.type === 'title') as any
+      return raw?.title?.map((t: any) => t.plain_text).join('') || '(untitled)'
+    }
+
+    const isInsideArchive = (pageId: string): boolean => {
+      const visited = new Set<string>()
+      let current: string | null = pageId
+      while (current) {
+        if (visited.has(current)) break
+        visited.add(current)
+        const pg = pages.find((p) => p.id === current)
+        if (!pg) break
+        if (titleOf(pg) === ARCHIVE_ROOT_TITLE) return true
+        current = parentById.get(current) ?? null
+      }
+      return false
+    }
+
+    const candidates = pages.filter((p) => !isInsideArchive(p.id))
+    const result: Array<{ pageId: string; pageTitle: string; text: string }> = []
+
+    for (const page of candidates) {
+      let blocks: BlockObjectResponse[]
+      try {
+        blocks = await this.getPageBlocks(page.id)
+      } catch {
+        continue
+      }
+
+      const textParts: string[] = []
+      for (const block of blocks) {
+        const richTexts = getRichTexts(block)
+        for (const rt of richTexts) {
+          if (rt.type === 'text' && rt.text) {
+            textParts.push(rt.text.content)
+          }
+        }
+      }
+
+      result.push({
+        pageId: page.id,
+        pageTitle: titleOf(page),
+        text: textParts.join(' '),
+      })
+    }
+
+    return result
   }
 
   // Count pages with no content blocks. Batches requests to avoid rate limits.
@@ -891,7 +1087,11 @@ export class NotionClient {
 }
 
 // Extracts all rich text arrays from a block (covers paragraph, headings, bullets, etc.)
-type RichTextItem = { type: string; mention: { type: string; page: { id: string } } }
+type RichTextItem = {
+  type: string
+  text?: { content: string; link: { url: string } | null }
+  mention?: { type: string; page?: { id: string } }
+}
 
 function getRichTexts(block: BlockObjectResponse): RichTextItem[] {
   const b = block as unknown as Record<string, { rich_text?: RichTextItem[] }>
@@ -899,3 +1099,29 @@ function getRichTexts(block: BlockObjectResponse): RichTextItem[] {
   if (inner && Array.isArray(inner.rich_text)) return inner.rich_text as RichTextItem[]
   return []
 }
+
+interface SensitivePattern {
+  name: string
+  category: SensitiveCategory
+  regex: RegExp
+}
+
+const SENSITIVE_PATTERNS: SensitivePattern[] = [
+  // API Keys
+  { name: 'OpenAI API Key',         category: 'api_key',    regex: /sk-(?:proj-)?[A-Za-z0-9_-]{20,}/g },
+  { name: 'Anthropic API Key',      category: 'api_key',    regex: /sk-ant-[A-Za-z0-9_-]{20,}/g },
+  { name: 'xAI / Grok Key',         category: 'api_key',    regex: /xai-[A-Za-z0-9_-]{20,}/g },
+  { name: 'Stripe Secret Key',      category: 'api_key',    regex: /sk_(?:live|test)_[A-Za-z0-9]{16,}/g },
+  { name: 'Stripe Publishable Key', category: 'api_key',    regex: /pk_(?:live|test)_[A-Za-z0-9]{16,}/g },
+  { name: 'AWS Access Key ID',      category: 'api_key',    regex: /AKIA[0-9A-Z]{16}/g },
+  { name: 'GitHub Token',           category: 'api_key',    regex: /(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,}/g },
+  { name: 'GitHub PAT',             category: 'api_key',    regex: /github_pat_[A-Za-z0-9_]{36,}/g },
+  // Crypto / Private Keys
+  { name: 'PEM Private Key',        category: 'crypto',     regex: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g },
+  { name: 'JWT Token',              category: 'crypto',     regex: /eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g },
+  // Credentials
+  { name: 'Database URL',           category: 'credential', regex: /(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis):\/\/[^\s"'<>]{8,}/gi },
+  { name: 'Password in Code',       category: 'credential', regex: /(?:password|passwd|secret|api_secret|client_secret)\s*[=:]\s*["']?[^\s"',;]{8,}/gi },
+  // PII
+  { name: 'Credit Card Number',     category: 'pii',        regex: /\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b/g },
+]

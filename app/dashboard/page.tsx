@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Navbar } from '@/components/Navbar'
 import { CyberLoader } from '@/components/CyberLoader'
-import { GitMerge, Trash2, Network, Database, Sparkles, AlertTriangle, RefreshCw, ScanSearch, Link2Off } from 'lucide-react'
+import { GitMerge, Trash2, Network, Database, Sparkles, AlertTriangle, RefreshCw, ScanSearch, Link2Off, ShieldAlert } from 'lucide-react'
 import type { WorkspaceStats } from '@/lib/notion/NotionClient'
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
@@ -286,6 +286,12 @@ export default function DashboardPage() {
                 icon={<Link2Off size={20} />}
                 title="Dead Link Detector"
                 description="Find @mentions pointing to deleted or missing pages."
+              />
+              <FeatureLink
+                href="/doctor/sensitive"
+                icon={<ShieldAlert size={20} />}
+                title="Sensitive Data Finder"
+                description="Scan every page for accidentally stored API keys, tokens, and credentials."
               />
               <FeatureLink
                 href="/graph"
