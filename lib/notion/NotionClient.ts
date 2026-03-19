@@ -483,7 +483,7 @@ export class NotionClient {
   // Uses full recursive block traversal so toggles, callouts, and nested content are covered.
   // Archive pages are excluded. Matches are redacted — only first 8 + last 4 chars shown.
   async getSensitiveFindings(): Promise<SensitiveScanResult> {
-    const pages = await this.getAllPages()
+    const pages = await getOrFetchAllPages(this)
 
     // Build parent map and identify archive pages
     const parentById = new Map<string, string | null>()
