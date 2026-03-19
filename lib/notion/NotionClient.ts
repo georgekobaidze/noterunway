@@ -485,8 +485,9 @@ export class NotionClient {
   async getSensitiveFindings(): Promise<SensitiveScanResult> {
     const pages = await getOrFetchAllPages(this)
 
-    // Build parent map and identify archive pages
+    // Build parent and page lookup maps
     const parentById = new Map<string, string | null>()
+    const pageById = new Map<string, (typeof pages)[number]>()
     for (const page of pages) {
       const p = page.parent
       const parentId =
@@ -494,11 +495,20 @@ export class NotionClient {
         : p.type === 'database_id' ? p.database_id
         : null
       parentById.set(page.id, parentId)
+      pageById.set(page.id, page)
     }
 
     const titleOf = (page: (typeof pages)[number]): string => {
       const raw = Object.values(page.properties).find((prop) => prop.type === 'title') as any
       return raw?.title?.map((t: any) => t.plain_text).join('') || '(untitled)'
+    }
+
+    // Precompute archive root page IDs so we don't repeatedly parse titles
+    const archiveRootIds = new Set<string>()
+    for (const page of pages) {
+      if (titleOf(page) === ARCHIVE_ROOT_TITLE) {
+        archiveRootIds.add(page.id)
+      }
     }
 
     const isInsideArchive = (pageId: string): boolean => {
@@ -507,10 +517,9 @@ export class NotionClient {
       while (current) {
         if (visited.has(current)) break
         visited.add(current)
-        const pg = pages.find((p) => p.id === current)
+        if (archiveRootIds.has(current)) return true
+        const pg = pageById.get(current)
         if (!pg) break
-        const t = titleOf(pg)
-        if (t === ARCHIVE_ROOT_TITLE) return true
         current = parentById.get(current) ?? null
       }
       return false
