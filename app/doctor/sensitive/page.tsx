@@ -244,13 +244,20 @@ export default function SensitiveDataPage() {
             )}
           </button>
 
-          {result && !scanning && (
-            <span className="text-xs font-mono text-muted-foreground">
-              {totalFindings === 0
-                ? '✦ No sensitive data found'
-                : `✦ ${totalFindings} finding${totalFindings !== 1 ? 's' : ''} across ${grouped.size + groupedAI.size} page${grouped.size + groupedAI.size !== 1 ? 's' : ''}`}
-            </span>
-          )}
+          {result && !scanning && (() => {
+            const pagesWithFindings = new Set([
+              ...grouped.keys(),
+              ...groupedAI.keys(),
+            ]).size
+
+            return (
+              <span className="text-xs font-mono text-muted-foreground">
+                {totalFindings === 0
+                  ? '✦ No sensitive data found'
+                  : `✦ ${totalFindings} finding${totalFindings !== 1 ? 's' : ''} across ${pagesWithFindings} page${pagesWithFindings !== 1 ? 's' : ''}`}
+              </span>
+            )
+          })()}
         </div>
 
         {/* Stats row */}
