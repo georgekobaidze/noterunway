@@ -796,13 +796,14 @@ export class NotionClient {
       const pid = parentById.get(page.id) ?? null
       const hasParentInWorkspace = pid !== null && candidateIds.has(pid)
       const hasInboundMention = nodesWithInboundMentions.has(page.id)
+      const depth = depthOf(page.id)
       return {
         id: page.id,
         title: titleOf(page),
-        depth: depthOf(page.id),
+        depth,
         // Root pages (depth 0) are intentionally at workspace level — not orphans.
         // A true orphan is a non-root page with no parent in the workspace and no inbound mentions.
-        isOrphan: depthOf(page.id) > 0 && !hasParentInWorkspace && !hasInboundMention,
+        isOrphan: depth > 0 && !hasParentInWorkspace && !hasInboundMention,
         parentId: hasParentInWorkspace ? pid : null,
         childCount: childCount.get(page.id) ?? 0,
         mentionCount: mentionTargetCount.get(page.id) ?? 0,
