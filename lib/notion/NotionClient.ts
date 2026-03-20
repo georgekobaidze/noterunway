@@ -813,6 +813,35 @@ export class NotionClient {
 
     return { nodes, edges, stats: { totalPages: candidates.length, archiveExcluded, orphanCount, edgeCount: edges.length } }
   }
+
+  // Get plain text content of a single page (shallow — top-level blocks only for speed)
+  async getPageText(pageId: string): Promise<string> {
+    try {
+      const blocks = await this.getPageBlocks(pageId)
+      const parts: string[] = []
+      for (const block of blocks) {
+        const rts = getRichTexts(block as BlockObjectResponse)
+        for (const rt of rts) {
+          if (rt.type === 'text' && rt.text) parts.push(rt.text.content)
+        }
+      }
+      return parts.join('\n')
+    } catch {
+      return ''
+    }
+  }
+
+  // Create a page with markdown content under a specified parent page
+  async createPage(title: string, markdown: string, parentPageId: string): Promise<string> {
+    const children = markdownToNotionBlocks(markdown)
+    const page = await this.client.pages.create({
+      parent: { page_id: parentPageId },
+      properties: { title: { title: [{ type: 'text', text: { content: title } }] } },
+      children: children.slice(0, 100) as any,
+    })
+    return page.id
+  }
+
   async getEmptyPageCount(): Promise<number> {
     const pages = await this.getAllPages()
     let emptyCount = 0
@@ -1284,3 +1313,23 @@ const SENSITIVE_PATTERNS: SensitivePattern[] = [
   // PII
   { name: 'Credit Card Number',     category: 'pii',        regex: /\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b/g },
 ]
+
+// Converts a markdown string to Notion block objects for use with the pages.create API.
+function markdownToNotionBlocks(markdown: string): unknown[] {
+  const blocks: unknown[] = []
+  for (const line of markdown.split('\n')) {
+    if (line.startsWith('# '))
+      blocks.push({ object: 'block', type: 'heading_1', heading_1: { rich_text: [{ type: 'text', text: { content: line.slice(2) } }] } })
+    else if (line.startsWith('## '))
+      blocks.push({ object: 'block', type: 'heading_2', heading_2: { rich_text: [{ type: 'text', text: { content: line.slice(3) } }] } })
+    else if (line.startsWith('### '))
+      blocks.push({ object: 'block', type: 'heading_3', heading_3: { rich_text: [{ type: 'text', text: { content: line.slice(4) } }] } })
+    else if (line.startsWith('- ') || line.startsWith('* '))
+      blocks.push({ object: 'block', type: 'bulleted_list_item', bulleted_list_item: { rich_text: [{ type: 'text', text: { content: line.slice(2) } }] } })
+    else if (/^\d+\. /.test(line))
+      blocks.push({ object: 'block', type: 'numbered_list_item', numbered_list_item: { rich_text: [{ type: 'text', text: { content: line.replace(/^\d+\. /, '') } }] } })
+    else if (line.trim())
+      blocks.push({ object: 'block', type: 'paragraph', paragraph: { rich_text: [{ type: 'text', text: { content: line } }] } })
+  }
+  return blocks
+}
