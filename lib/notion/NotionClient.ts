@@ -767,10 +767,11 @@ export class NotionClient {
                   const targetId = rt.mention.page!.id
                   if (!candidateIds.has(targetId) || targetId === page.id) continue
                   const edgeId = `mention:${page.id}→${targetId}`
-                  if (!edges.some((e) => e.id === edgeId)) {
+                  const isNewEdge = !edges.some((e) => e.id === edgeId)
+                  if (isNewEdge) {
                     edges.push({ id: edgeId, source: page.id, target: targetId, type: 'mention' })
+                    mentionTargetCount.set(targetId, (mentionTargetCount.get(targetId) ?? 0) + 1)
                   }
-                  mentionTargetCount.set(targetId, (mentionTargetCount.get(targetId) ?? 0) + 1)
                 }
               }
             }
