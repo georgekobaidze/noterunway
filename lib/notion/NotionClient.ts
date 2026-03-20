@@ -791,11 +791,11 @@ export class NotionClient {
     }
 
     // Determine orphans: no parent in workspace AND no inbound mention edges
-    const nodesWithInbound = new Set(edges.map((e) => e.target))
+    const nodesWithInboundMentions = new Set(edges.filter((e) => e.type === 'mention').map((e) => e.target))
     const nodes: GraphNode[] = candidates.map((page) => {
       const pid = parentById.get(page.id) ?? null
       const hasParentInWorkspace = pid !== null && candidateIds.has(pid)
-      const hasInboundMention = nodesWithInbound.has(page.id)
+      const hasInboundMention = nodesWithInboundMentions.has(page.id)
       return {
         id: page.id,
         title: titleOf(page),
