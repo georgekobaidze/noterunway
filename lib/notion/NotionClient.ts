@@ -102,6 +102,34 @@ export interface SensitiveScanResult {
   }
 }
 
+export interface GraphNode {
+  id: string
+  title: string
+  depth: number        // 0 = root, 1 = child of root, etc.
+  isOrphan: boolean    // no parent and no inbound mention edges
+  parentId: string | null
+  childCount: number
+  mentionCount: number // number of @mention edges pointing TO this node
+}
+
+export interface GraphEdge {
+  id: string
+  source: string
+  target: string
+  type: 'parent' | 'mention'
+}
+
+export interface GraphData {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+  stats: {
+    totalPages: number
+    archiveExcluded: number
+    orphanCount: number
+    edgeCount: number
+  }
+}
+
 export class NotionError extends Error {
   constructor(
     message: string,
@@ -591,7 +619,7 @@ export class NotionClient {
   // Returns all non-archived pages with their full text content concatenated.
   // Used by the deep AI scan to send page text to an LLM.
   async getAllPagesWithText(): Promise<Array<{ pageId: string; pageTitle: string; text: string }>> {
-    const pages = await this.getOrFetchAllPages()
+    const pages = await getOrFetchAllPages(this)
 
     const parentById = new Map<string, string | null>()
     for (const page of pages) {
@@ -653,7 +681,139 @@ export class NotionClient {
     return result
   }
 
-  // Count pages with no content blocks. Batches requests to avoid rate limits.
+  // Build graph data: nodes (pages) + edges (parent/child + @mention links).
+  // Archive pages are excluded. Scans top-level blocks only for @mentions (fast pass).
+  async getGraphData(): Promise<GraphData> {
+    const pages = await getOrFetchAllPages(this)
+
+    const parentById = new Map<string, string | null>()
+    const pageById = new Map<string, (typeof pages)[number]>()
+    for (const page of pages) {
+      const p = page.parent
+      const parentId =
+        p.type === 'page_id' ? p.page_id
+        : p.type === 'database_id' ? p.database_id
+        : null
+      parentById.set(page.id, parentId)
+      pageById.set(page.id, page)
+    }
+
+    const titleOf = (page: (typeof pages)[number]): string => {
+      const raw = Object.values(page.properties).find((prop) => prop.type === 'title') as any
+      return raw?.title?.map((t: any) => t.plain_text).join('') || '(untitled)'
+    }
+
+    const archiveRootIds = new Set<string>()
+    for (const page of pages) {
+      if (titleOf(page) === ARCHIVE_ROOT_TITLE) archiveRootIds.add(page.id)
+    }
+
+    const isInsideArchive = (pageId: string): boolean => {
+      const visited = new Set<string>()
+      let current: string | null = pageId
+      while (current) {
+        if (visited.has(current)) break
+        visited.add(current)
+        if (archiveRootIds.has(current)) return true
+        const pg = pageById.get(current)
+        if (!pg) break
+        current = parentById.get(current) ?? null
+      }
+      return false
+    }
+
+    const candidates = pages.filter((p) => !isInsideArchive(p.id))
+    const candidateIds = new Set(candidates.map((p) => p.id))
+    const archiveExcluded = pages.length - candidates.length
+
+    // Compute depth for each node
+    const depthOf = (pageId: string): number => {
+      let depth = 0
+      const visited = new Set<string>()
+      let current: string | null = parentById.get(pageId) ?? null
+      while (current && candidateIds.has(current)) {
+        if (visited.has(current)) break
+        visited.add(current)
+        depth++
+        current = parentById.get(current) ?? null
+      }
+      return depth
+    }
+
+    // Build parent/child edges
+    const edges: GraphEdge[] = []
+    for (const page of candidates) {
+      const pid = parentById.get(page.id) ?? null
+      if (pid && candidateIds.has(pid)) {
+        edges.push({ id: `parent:${pid}→${page.id}`, source: pid, target: page.id, type: 'parent' })
+      }
+    }
+
+    // Scan top-level blocks for @mention edges (fast, no recursion needed for graph)
+    const mentionTargetCount = new Map<string, number>()
+    const BATCH = 10
+    for (let i = 0; i < candidates.length; i += BATCH) {
+      const batch = candidates.slice(i, i + BATCH)
+      await Promise.all(batch.map(async (page) => {
+        try {
+          let cursor: string | undefined
+          do {
+            const res = await this.client.blocks.children.list({ block_id: page.id, start_cursor: cursor, page_size: 100 })
+            for (const block of res.results) {
+              if (!('type' in block)) continue
+              const richTexts = getRichTexts(block as BlockObjectResponse)
+              for (const rt of richTexts) {
+                if (rt.type === 'mention' && rt.mention?.type === 'page') {
+                  const targetId = rt.mention.page!.id
+                  if (!candidateIds.has(targetId) || targetId === page.id) continue
+                  const edgeId = `mention:${page.id}→${targetId}`
+                  const isNewEdge = !edges.some((e) => e.id === edgeId)
+                  if (isNewEdge) {
+                    edges.push({ id: edgeId, source: page.id, target: targetId, type: 'mention' })
+                    mentionTargetCount.set(targetId, (mentionTargetCount.get(targetId) ?? 0) + 1)
+                  }
+                }
+              }
+            }
+            cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined
+          } while (cursor)
+        } catch { /* skip inaccessible pages */ }
+      }))
+    }
+
+    // Count children per node
+    const childCount = new Map<string, number>()
+    for (const page of candidates) {
+      const pid = parentById.get(page.id) ?? null
+      if (pid && candidateIds.has(pid)) {
+        childCount.set(pid, (childCount.get(pid) ?? 0) + 1)
+      }
+    }
+
+    // Determine orphans: no parent in workspace AND no inbound mention edges
+    const nodesWithInboundMentions = new Set(edges.filter((e) => e.type === 'mention').map((e) => e.target))
+    const nodes: GraphNode[] = candidates.map((page) => {
+      const pid = parentById.get(page.id) ?? null
+      const hasParentInWorkspace = pid !== null && candidateIds.has(pid)
+      const hasInboundMention = nodesWithInboundMentions.has(page.id)
+      const depth = depthOf(page.id)
+      return {
+        id: page.id,
+        title: titleOf(page),
+        depth,
+        // Root pages (depth 0) are intentionally at workspace level — not orphans.
+        // A true orphan is a non-root page with no parent in the workspace and no inbound mentions.
+        isOrphan: depth > 0 && !hasParentInWorkspace && !hasInboundMention,
+        parentId: hasParentInWorkspace ? pid : null,
+        childCount: childCount.get(page.id) ?? 0,
+        mentionCount: mentionTargetCount.get(page.id) ?? 0,
+      }
+    })
+
+    const orphanCount = nodes.filter((n) => n.isOrphan).length
+
+    return { nodes, edges, stats: { totalPages: candidates.length, archiveExcluded, orphanCount, edgeCount: edges.length } }
+  }
   async getEmptyPageCount(): Promise<number> {
     const pages = await this.getAllPages()
     let emptyCount = 0
