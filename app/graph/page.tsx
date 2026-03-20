@@ -406,7 +406,10 @@ export default function GraphPage() {
     }))
   }, [hoveredId, connectedIds, setEdges])
 
-  const hoverCtx: HoverCtx = { hoveredId, connectedIds }
+  const hoverCtx = useMemo<HoverCtx>(
+    () => ({ hoveredId, connectedIds }),
+    [hoveredId, connectedIds],
+  )
   const selectedNode = graphData?.nodes.find((n) => n.id === selectedId) ?? null
 
   return (
