@@ -368,8 +368,8 @@ export class NotionClient {
                 const richTexts = getRichTexts(b)
                 for (const rt of richTexts) {
                   if (rt.type === 'mention' && rt.mention?.type === 'page') {
-                    const id = rt.mention.page!.id
-                    if (pageIds.has(id)) mentionedIds.add(id)
+                    const id = rt.mention.page?.id
+                    if (id && pageIds.has(id)) mentionedIds.add(id)
                   }
                 }
               }
@@ -443,19 +443,18 @@ export class NotionClient {
                 const richTexts = getRichTexts(block as BlockObjectResponse)
                 for (const rt of richTexts) {
                   if (rt.type === 'mention' && rt.mention?.type === 'page') {
-                    const targetId = rt.mention.page!.id
-                    if (!pageIds.has(targetId)) {
-                      // Only add once per source→target pair
-                      const pairKey = `${page.id}:${targetId}`
-                      if (!seenDeadLinkPairs.has(pairKey)) {
-                        seenDeadLinkPairs.add(pairKey)
-                        deadLinks.push({
-                          sourcePageId: page.id,
-                          sourcePageTitle: sourceTitle,
-                          brokenTargetId: targetId,
-                          brokenTargetTitle: null,
-                        })
-                      }
+                    const targetId = rt.mention.page?.id
+                    if (!targetId || pageIds.has(targetId)) continue
+                    // Only add once per source→target pair
+                    const pairKey = `${page.id}:${targetId}`
+                    if (!seenDeadLinkPairs.has(pairKey)) {
+                      seenDeadLinkPairs.add(pairKey)
+                      deadLinks.push({
+                        sourcePageId: page.id,
+                        sourcePageTitle: sourceTitle,
+                        brokenTargetId: targetId,
+                        brokenTargetTitle: null,
+                      })
                     }
                   }
                 }
@@ -764,8 +763,8 @@ export class NotionClient {
               const richTexts = getRichTexts(block as BlockObjectResponse)
               for (const rt of richTexts) {
                 if (rt.type === 'mention' && rt.mention?.type === 'page') {
-                  const targetId = rt.mention.page!.id
-                  if (!candidateIds.has(targetId) || targetId === page.id) continue
+                  const targetId = rt.mention.page?.id
+                  if (!targetId || !candidateIds.has(targetId) || targetId === page.id) continue
                   const edgeId = `mention:${page.id}→${targetId}`
                   const isNewEdge = !edges.some((e) => e.id === edgeId)
                   if (isNewEdge) {
