@@ -420,7 +420,7 @@ export default function GraphPage() {
   // Sync ref so the rebuild effect always has the current hover state
   useEffect(() => {
     hoveredIdRef.current = hoveredId
-  })
+  }, [hoveredId])
 
   // Update edge opacity on hover without touching nodes
   useEffect(() => {
