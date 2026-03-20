@@ -172,22 +172,43 @@ function buildFlow(
 ): { nodes: Node[]; edges: Edge[] } {
 
   // A node is visible only if its entire ancestor chain is expanded.
-  const visibleIds = new Set<string>()
+  // Build a parent -> children adjacency map once, then BFS from roots following
+  // only expanded parents to determine visibility in O(N + E).
+  const parentToChildren = new Map<string, string[]>()
   for (const n of graphNodes) {
-    if (n.parentId === null) visibleIds.add(n.id)
+    if (n.parentId !== null) {
+      const children = parentToChildren.get(n.parentId) ?? []
+      children.push(n.id)
+      parentToChildren.set(n.parentId, children)
+    }
   }
-  let changed = true
-  while (changed) {
-    changed = false
-    for (const n of graphNodes) {
-      if (visibleIds.has(n.id)) continue
-      if (n.parentId !== null && visibleIds.has(n.parentId) && expandedIds.has(n.parentId)) {
+
+  const visibleIds = new Set<string>()
+  const queue: string[] = []
+
+  // Roots (nodes without a parent) are always visible entry points.
+  for (const n of graphNodes) {
+    if (n.parentId === null) {
+      if (!visibleIds.has(n.id)) {
         visibleIds.add(n.id)
-        changed = true
+        queue.push(n.id)
       }
     }
   }
 
+  // BFS: a child is visible only if its parent is visible and expanded.
+  while (queue.length > 0) {
+    const currentId = queue.shift() as string
+    const children = parentToChildren.get(currentId)
+    if (!children || !expandedIds.has(currentId)) continue
+
+    for (const childId of children) {
+      if (!visibleIds.has(childId)) {
+        visibleIds.add(childId)
+        queue.push(childId)
+      }
+    }
+  }
   const positions = layoutNodes(graphNodes, visibleIds)
 
   const nodes: Node[] = graphNodes
