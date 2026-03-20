@@ -353,6 +353,10 @@ export default function GraphPage() {
     setExpandedIds(new Set())
   }, [])
 
+  // Ref so the rebuild effect can read the current hover state without adding
+  // it as a dependency (which would cause node flicker on every hover).
+  const hoveredIdRef = useRef<string | null>(null)
+
   // Rebuild only when structure changes (expand/collapse or selection) — NOT on hover
   useEffect(() => {
     if (!prevData.current) return
@@ -361,7 +365,12 @@ export default function GraphPage() {
       expandedIds, selectedId, onToggle, onSelect,
     )
     setNodes(n)
-    setEdges(e)
+    // Apply current hover state immediately so edge styles survive a rebuild
+    const hId = hoveredIdRef.current
+    setEdges(hId ? e.map((edge) => {
+      const connected = edge.source === hId || edge.target === hId
+      return { ...edge, style: { ...edge.style, opacity: connected ? 1 : 0.05, strokeWidth: connected ? 2 : 1 } }
+    }) : e)
   }, [expandedIds, selectedId, onToggle, onSelect, setNodes, setEdges])
 
   const load = async () => {
@@ -408,13 +417,14 @@ export default function GraphPage() {
     return s
   }, [hoveredId])
 
+  // Sync ref so the rebuild effect always has the current hover state
+  useEffect(() => {
+    hoveredIdRef.current = hoveredId
+  }, [hoveredId])
+
   // Update edge opacity on hover without touching nodes
   useEffect(() => {
     setEdges((prev) => prev.map((e) => {
-      const active = !hoveredId || (
-        (e.source === hoveredId || e.target === hoveredId) ||
-        (connectedIds.has(e.source) && connectedIds.has(e.target))
-      )
       const connected = hoveredId && (e.source === hoveredId || e.target === hoveredId)
       return {
         ...e,
