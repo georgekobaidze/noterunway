@@ -319,7 +319,7 @@ export default function AskPage() {
     setExecuting(true)
     const actions = result.archiveCandidates
       .filter(c => selectedArchive.has(c.pageId))
-      .map(c => ({ type: 'archive' as const, pageId: c.pageId, pageTitle: c.pageTitle }))
+      .map(c => ({ type: 'archive' as const, pageId: c.pageId, pageTitle: c.pageTitle, reason: c.reason }))
 
     try {
       const res = await fetch('/api/ask', {
