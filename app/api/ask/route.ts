@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
       const results: string[] = []
       for (const action of (executeActions ?? [])) {
         if (action.type === 'archive') {
-          await notion.archivePage(action.pageId)
+          await notion.moveToArchive(action.pageId, 'ask', `Ask execute phase archived page "${action.pageTitle}"`)
           results.push(`Archived: ${action.pageTitle}`)
         } else if (action.type === 'create') {
           const pageId = await notion.createPage(action.title, action.content, action.parentPageId)
