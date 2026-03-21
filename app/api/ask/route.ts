@@ -104,17 +104,57 @@ export async function POST(req: NextRequest) {
     // ── Execute phase ──────────────────────────────────────────────────────────
 
     if (phase === 'execute') {
-      const results: string[] = []
-      for (const action of (executeActions ?? [])) {
-        if (action.type === 'archive') {
-          await notion.moveToArchive(action.pageId, 'ask', `Ask execute phase archived page "${action.pageTitle}"`)
-          results.push(`Archived: ${action.pageTitle}`)
-        } else if (action.type === 'create') {
-          const pageId = await notion.createPage(action.title, action.content, action.parentPageId)
-          results.push(`Created page: ${action.title} (${pageId})`)
-        }
+      if (!Array.isArray(executeActions) || executeActions.length === 0) {
+        return NextResponse.json({ error: 'missing_actions' }, { status: 400 })
       }
-      return NextResponse.json({ success: true, results })
+
+      const MAX_ACTIONS = 50
+      if (executeActions.length > MAX_ACTIONS) {
+        return NextResponse.json(
+          { error: `too_many_actions: max ${MAX_ACTIONS} per request` },
+          { status: 400 }
+        )
+      }
+
+      const results: string[] = []
+      const failedActions: string[] = []
+      const concurrency = 5
+
+      for (let i = 0; i < executeActions.length; i += concurrency) {
+        const batch = executeActions.slice(i, i + concurrency)
+        await Promise.all(
+          batch.map(async (action) => {
+            if (action.type === 'archive') {
+              try {
+                await notion.moveToArchive(action.pageId, 'ask', {
+                  title: action.pageTitle,
+                  reason: 'Archived via NoteRunway Ask',
+                })
+                results.push(`Archived: ${action.pageTitle}`)
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err)
+                failedActions.push(`archive "${action.pageTitle}" (${action.pageId}): ${msg}`)
+                console.error(`Execute action failed – archive "${action.pageTitle}":`, err)
+              }
+            } else if (action.type === 'create') {
+              try {
+                const pageId = await notion.createPage(action.title, action.content, action.parentPageId)
+                results.push(`Created page: ${action.title} (${pageId})`)
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err)
+                failedActions.push(`create "${action.title}": ${msg}`)
+                console.error(`Execute action failed – create "${action.title}":`, err)
+              }
+            } else {
+              const label = (action as { type: string }).type ?? 'unknown'
+              failedActions.push(`Unhandled action type: ${label}`)
+              console.warn('Unhandled execute action:', action)
+            }
+          })
+        )
+      }
+
+      return NextResponse.json({ success: true, results, failedActions })
     }
 
     // ── Plan phase ─────────────────────────────────────────────────────────────
