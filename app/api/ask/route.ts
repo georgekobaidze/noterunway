@@ -6,15 +6,18 @@ import { getModelWithKey, MODEL_META, DEFAULT_MODEL, type ModelId } from '@/lib/
 
 // ─── Request / Action types ───────────────────────────────────────────────────
 
-type ExecuteAction =
-  | { type: 'archive'; pageId: string; pageTitle: string }
-  | { type: 'create'; title: string; content: string; parentPageId: string }
+const ExecuteActionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('archive'), pageId: z.string(), pageTitle: z.string() }),
+  z.object({ type: z.literal('create'), title: z.string(), content: z.string(), parentPageId: z.string() }),
+])
 
-interface AskRequest {
-  command: string
-  phase: 'plan' | 'execute'
-  executeActions?: ExecuteAction[]
-}
+const AskRequestSchema = z.object({
+  command: z.string().min(1),
+  phase: z.enum(['plan', 'execute']),
+  executeActions: z.array(ExecuteActionSchema).optional(),
+})
+
+type AskRequest = z.infer<typeof AskRequestSchema>
 
 // ─── Zod schema for AI output ─────────────────────────────────────────────────
 
@@ -96,8 +99,15 @@ export async function POST(req: NextRequest) {
     : DEFAULT_MODEL
 
   try {
-    const body = await req.json() as AskRequest
-    const { command, phase, executeActions } = body
+    const raw = await req.json().catch(() => null)
+    const parsed = AskRequestSchema.safeParse(raw)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'invalid_request', details: parsed.error.flatten() },
+        { status: 400 },
+      )
+    }
+    const { command, phase, executeActions } = parsed.data
 
     const notion = new NotionClient(token)
 
