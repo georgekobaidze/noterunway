@@ -821,8 +821,12 @@ export class NotionClient {
       const parts: string[] = []
       for (const block of blocks) {
         const rts = getRichTexts(block as BlockObjectResponse)
+        const inlineParts: string[] = []
         for (const rt of rts) {
-          if (rt.type === 'text' && rt.text) parts.push(rt.text.content)
+          if (rt.type === 'text' && rt.text) inlineParts.push(rt.text.content)
+        }
+        if (inlineParts.length > 0) {
+          parts.push(inlineParts.join(''))
         }
       }
       return parts.join('\n')
