@@ -386,7 +386,7 @@ export default function AskPage() {
     }
   }
 
-  const hasKey = !!settings.aiKey
+  const hasKey = !!aiKey
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
