@@ -837,13 +837,17 @@ export class NotionClient {
 
   // Create a page with markdown content under a specified parent page
   async createPage(title: string, markdown: string, parentPageId: string): Promise<string> {
-    const children = markdownToNotionBlocks(markdown)
-    const page = await this.client.pages.create({
-      parent: { page_id: parentPageId },
-      properties: { title: { title: [{ type: 'text', text: { content: title } }] } },
-      children: children.slice(0, 100) as any,
-    })
-    return page.id
+    try {
+      const children = markdownToNotionBlocks(markdown)
+      const page = await this.client.pages.create({
+        parent: { page_id: parentPageId },
+        properties: { title: { title: [{ type: 'text', text: { content: title } }] } },
+        children: children.slice(0, 100) as any,
+      })
+      return page.id
+    } catch (err) {
+      throw this.handleError(err)
+    }
   }
 
   async getEmptyPageCount(): Promise<number> {
