@@ -266,7 +266,7 @@ function SavePanel({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AskPage() {
-  const { settings, aiKey, loaded } = useSettings()
+  const { settings, aiKey } = useSettings()
   const [command, setCommand] = useState('')
   const [loading, setLoading] = useState(false)
   const [executing, setExecuting] = useState(false)
@@ -319,7 +319,7 @@ export default function AskPage() {
     setExecuting(true)
     const actions = result.archiveCandidates
       .filter(c => selectedArchive.has(c.pageId))
-      .map(c => ({ type: 'archive' as const, pageId: c.pageId, pageTitle: c.pageTitle }))
+      .map(c => ({ type: 'archive' as const, pageId: c.pageId, pageTitle: c.pageTitle, reason: c.reason }))
 
     try {
       const res = await fetch('/api/ask', {
@@ -423,7 +423,10 @@ export default function AskPage() {
             rows={3}
             value={command}
             onChange={e => setCommand(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmit() }}
+            onKeyDown={e => {
+              if (!hasKey) return
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmit()
+            }}
             placeholder="Ask anything about your workspace…"
             className="w-full bg-transparent border border-white/10 rounded-lg p-4 text-sm resize-none focus:outline-none focus:border-[#00d4ff]/50 placeholder:text-muted-foreground"
             disabled={loading}
