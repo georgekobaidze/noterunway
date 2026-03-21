@@ -266,7 +266,7 @@ function SavePanel({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AskPage() {
-  const { settings, aiKey, loaded } = useSettings()
+  const { settings, aiKey } = useSettings()
   const [command, setCommand] = useState('')
   const [loading, setLoading] = useState(false)
   const [executing, setExecuting] = useState(false)
