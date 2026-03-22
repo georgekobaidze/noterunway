@@ -112,14 +112,31 @@ export async function POST(req: NextRequest) {
 
         results.push(`Created: ${action.title}`)
       } else if (action.type === 'update') {
-        // Step 1: fetch existing blocks so we can delete them
-        const existingR = await mcpClient.executeTool({
-          tool: 'API-get-block-children',
-          parameters: { block_id: action.pageId },
-          approved: false,
-        })
-        if (existingR.success) {
-          const existing = (existingR.data as { results?: { id: string }[] } | null)?.results ?? []
+        // Step 1: paginate through ALL existing blocks and delete them
+        let cursor: string | undefined
+        let fetchFailed = false
+        do {
+          const params: Record<string, unknown> = { block_id: action.pageId }
+          if (cursor) params.start_cursor = cursor
+
+          const existingR = await mcpClient.executeTool({
+            tool: 'API-get-block-children',
+            parameters: params,
+            approved: false,
+          })
+
+          if (!existingR.success) {
+            fetchFailed = true
+            break
+          }
+
+          const page = existingR.data as {
+            results?: { id: string }[]
+            has_more?: boolean
+            next_cursor?: string | null
+          } | null
+
+          const existing = page?.results ?? []
           for (const block of existing) {
             if (block.id) {
               await mcpClient.executeTool({
@@ -129,17 +146,31 @@ export async function POST(req: NextRequest) {
               })
             }
           }
+
+          cursor = page?.has_more ? page.next_cursor ?? undefined : undefined
+        } while (cursor)
+
+        if (fetchFailed) {
+          failedActions.push(`update "${action.pageTitle}": failed to fetch existing blocks`)
+          continue
         }
 
-        // Step 2: append the new content blocks
+        // Step 2: append the new content blocks in chunks of 100
         const blocks = markdownToNotionBlocks(action.content)
-        const appendR = await mcpClient.executeTool({
-          tool: 'API-patch-block-children',
-          parameters: { block_id: action.pageId, children: blocks.slice(0, 100) },
-          approved: true,
-        })
-        if (appendR.success) results.push(`Updated: ${action.pageTitle}`)
-        else failedActions.push(`update "${action.pageTitle}": ${appendR.error ?? 'Unknown error'}`)
+        let updateFailed = false
+        for (let i = 0; i < blocks.length; i += 100) {
+          const appendR = await mcpClient.executeTool({
+            tool: 'API-patch-block-children',
+            parameters: { block_id: action.pageId, children: blocks.slice(i, i + 100) },
+            approved: true,
+          })
+          if (!appendR.success) {
+            failedActions.push(`update "${action.pageTitle}": ${appendR.error ?? 'Unknown error'}`)
+            updateFailed = true
+            break
+          }
+        }
+        if (!updateFailed) results.push(`Updated: ${action.pageTitle}`)
       }
     }
   } finally {
