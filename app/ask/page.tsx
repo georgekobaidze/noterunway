@@ -231,6 +231,7 @@ export default function AskPage() {
         ...prev.map(m => m.id === msgId ? { ...m, proposedActions: undefined } : m),
         resultMsg,
       ])
+      setTimeout(() => inputRef.current?.focus(), 50)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
       setMessages(prev => [
@@ -253,6 +254,7 @@ export default function AskPage() {
       toolSteps: [],
       status: 'done',
     }])
+    setTimeout(() => inputRef.current?.focus(), 50)
   }, [])
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -261,6 +263,7 @@ export default function AskPage() {
   }
 
   const noKey = !aiKey
+  const pendingApproval = messages.some(m => m.proposedActions != null)
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -329,6 +332,9 @@ export default function AskPage() {
                         )}
                         {step.args.page_id != null && (
                           <span className="text-muted-foreground/25">{String(step.args.page_id).slice(0, 8)}…</span>
+                        )}
+                        {step.args.type != null && (
+                          <span className="text-muted-foreground/25">{String(step.args.type).replace(/_/g, ' ')}</span>
                         )}
                       </div>
                     ))}
@@ -399,6 +405,11 @@ export default function AskPage() {
               <p className="text-xs text-amber-400/60">
                 ⚠ No AI key configured.{' '}
                 <Link href="/settings" className="underline hover:text-amber-400">Add one in Settings</Link>
+              </p>
+            ) : pendingApproval ? (
+              <p className="text-xs text-amber-400/60 flex items-center gap-2">
+                <span className="animate-pulse">⠿</span>
+                Pending approval — use the <span className="text-amber-300">Confirm</span> or <span className="text-amber-300">Cancel</span> buttons above to proceed.
               </p>
             ) : (
               <form onSubmit={handleSubmit} className="flex items-center gap-2.5">

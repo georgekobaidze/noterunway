@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { MCPClient } from '@/lib/mcp/MCPClient'
-import { NotionClient } from '@/lib/notion/NotionClient'
+import { NotionClient, markdownToNotionBlocks } from '@/lib/notion/NotionClient'
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -16,7 +16,7 @@ const ActionSchema = z.discriminatedUnion('type', [
     type: z.literal('create'),
     parentPageId: z.string(),
     title: z.string(),
-    content: z.string(),
+    content: z.string().default(''),
   }),
   z.object({
     type: z.literal('update'),
@@ -74,7 +74,8 @@ export async function POST(req: NextRequest) {
           failedActions.push(`archive "${action.pageTitle}": ${message}`)
         }
       } else if (action.type === 'create') {
-        const r = await mcpClient.executeTool({
+        // Step 1: create the page shell via MCP
+        const createR = await mcpClient.executeTool({
           tool: 'API-post-page',
           parameters: {
             parent: { page_id: action.parentPageId },
@@ -86,27 +87,59 @@ export async function POST(req: NextRequest) {
           },
           approved: true,
         })
-        if (r.success) results.push(`Created: ${action.title}`)
-        else failedActions.push(`create "${action.title}": ${r.error ?? 'Unknown error'}`)
+        if (!createR.success) {
+          failedActions.push(`create "${action.title}": ${createR.error ?? 'Unknown error'}`)
+          continue
+        }
+
+        // Step 2: append content blocks via MCP
+        const newPageId = (createR.data as { id?: string } | null)?.id
+        if (newPageId && action.content.trim()) {
+          const blocks = markdownToNotionBlocks(action.content)
+          // Notion API allows at most 100 blocks per append call
+          for (let i = 0; i < blocks.length; i += 100) {
+            const appendR = await mcpClient.executeTool({
+              tool: 'API-patch-block-children',
+              parameters: { block_id: newPageId, children: blocks.slice(i, i + 100) },
+              approved: true,
+            })
+            if (!appendR.success) {
+              failedActions.push(`add content to "${action.title}": ${appendR.error ?? 'Unknown error'}`)
+              break
+            }
+          }
+        }
+
+        results.push(`Created: ${action.title}`)
       } else if (action.type === 'update') {
-        const r = await mcpClient.executeTool({
+        // Step 1: fetch existing blocks so we can delete them
+        const existingR = await mcpClient.executeTool({
+          tool: 'API-get-block-children',
+          parameters: { block_id: action.pageId },
+          approved: false,
+        })
+        if (existingR.success) {
+          const existing = (existingR.data as { results?: { id: string }[] } | null)?.results ?? []
+          for (const block of existing) {
+            if (block.id) {
+              await mcpClient.executeTool({
+                tool: 'API-delete-a-block',
+                parameters: { block_id: block.id },
+                approved: true,
+              })
+            }
+          }
+        }
+
+        // Step 2: append the new content blocks
+        const blocks = markdownToNotionBlocks(action.content)
+        const appendR = await mcpClient.executeTool({
           tool: 'API-patch-block-children',
-          parameters: {
-            block_id: action.pageId,
-            children: [
-              {
-                object: 'block',
-                type: 'paragraph',
-                paragraph: {
-                  rich_text: [{ type: 'text', text: { content: action.content } }],
-                },
-              },
-            ],
-          },
+          parameters: { block_id: action.pageId, children: blocks.slice(0, 100) },
           approved: true,
         })
-        if (r.success) results.push(`Updated: ${action.pageTitle}`)
-        else failedActions.push(`update "${action.pageTitle}": ${r.error ?? 'Unknown error'}`)
+        if (appendR.success) results.push(`Updated: ${action.pageTitle}`)
+        else failedActions.push(`update "${action.pageTitle}": ${appendR.error ?? 'Unknown error'}`)
       }
     }
   } finally {

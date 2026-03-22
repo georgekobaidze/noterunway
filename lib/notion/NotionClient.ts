@@ -1323,7 +1323,7 @@ const SENSITIVE_PATTERNS: SensitivePattern[] = [
 ]
 
 // Converts a markdown string to Notion block objects for use with the pages.create API.
-function markdownToNotionBlocks(markdown: string): unknown[] {
+export function markdownToNotionBlocks(markdown: string): unknown[] {
   const blocks: unknown[] = []
   for (const line of markdown.split('\n')) {
     if (line.startsWith('# '))

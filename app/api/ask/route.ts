@@ -16,16 +16,26 @@ You have tools to read the workspace:
 - run_analysis: run a built-in workspace analysis (dead_links, garbage, or workspace_stats)
 
 When asked to make changes (archive pages, create pages, update page content):
-1. Use read tools to find and understand the relevant pages first
-2. Call propose_actions with a structured list of changes — do not skip this step
-3. Briefly tell the user what you've proposed and ask them to confirm
+1. Use search_pages to find the relevant page(s) first — you MUST have the real page ID before calling propose_actions
+2. Extract the page ID from the search results (it is in the "id" field of each result object)
+3. Call propose_actions with a structured list of changes — do not skip this step
+4. Briefly tell the user what you've proposed
+
+IMPORTANT for create actions:
+- Always search for the parent page first to get its ID
+- The parentPageId field MUST be the UUID from search results, not a name
+- The content field can be an empty string "" if the user wants a blank page
+
+IMPORTANT for archive actions:
+- Search for the page, extract its "id" field, and use that as pageId
+- The id is a UUID like "32bc3afc-3cbd-817a-83e6-f1a01cd30ab8"
 
 Rules:
 - Never skip propose_actions for any write operation
+- Never ask the user for a page ID — find it yourself with search_pages
 - Be concise — this is a terminal interface
 - When searching, prefer targeted queries over broad ones
-- For questions about orphaned pages, dead links, or stale pages — use run_analysis
-- If a page ID is mentioned or returned by search, use get_page to read its content before acting on it`
+- For questions about orphaned pages, dead links, or stale pages — use run_analysis`
 
 // ─── POST /api/ask — streaming agentic chat ───────────────────────────────────
 
@@ -51,6 +61,15 @@ export async function POST(req: NextRequest) {
   const encoder = new TextEncoder()
   const mcpClient = new MCPClient(token)
   let stepCounter = 0
+  let mcpConnected = false
+
+  // Lazily connect MCP only when a tool actually fires
+  const ensureMcp = async () => {
+    if (!mcpConnected) {
+      await mcpClient.connect()
+      mcpConnected = true
+    }
+  }
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -58,8 +77,6 @@ export async function POST(req: NextRequest) {
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
 
       try {
-        await mcpClient.connect()
-
         const result = streamText({
           model,
           system: SYSTEM_PROMPT,
@@ -74,6 +91,7 @@ export async function POST(req: NextRequest) {
               execute: async (input) => {
                 const stepId = `step-${++stepCounter}`
                 send('tool_start', { stepId, tool: 'search_pages', args: { query: input.query } })
+                await ensureMcp()
                 const r = await mcpClient.executeTool({
                   tool: 'API-post-search',
                   parameters: { query: input.query, filter: { value: 'page', property: 'object' } },
@@ -92,6 +110,7 @@ export async function POST(req: NextRequest) {
               execute: async (input) => {
                 const stepId = `step-${++stepCounter}`
                 send('tool_start', { stepId, tool: 'get_page', args: { page_id: input.page_id } })
+                await ensureMcp()
                 const r = await mcpClient.executeTool({
                   tool: 'API-retrieve-a-page',
                   parameters: { page_id: input.page_id },
@@ -110,6 +129,7 @@ export async function POST(req: NextRequest) {
               execute: async (input) => {
                 const stepId = `step-${++stepCounter}`
                 send('tool_start', { stepId, tool: 'get_page_content', args: { page_id: input.page_id } })
+                await ensureMcp()
                 const r = await mcpClient.executeTool({
                   tool: 'API-get-block-children',
                   parameters: { block_id: input.page_id },
@@ -164,7 +184,7 @@ export async function POST(req: NextRequest) {
                       type: z.literal('create'),
                       parentPageId: z.string(),
                       title: z.string(),
-                      content: z.string(),
+                      content: z.string().default(''),
                     }),
                     z.object({
                       type: z.literal('update'),
