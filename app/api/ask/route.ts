@@ -5,6 +5,17 @@ import { MCPClient } from '@/lib/mcp/MCPClient'
 import { NotionClient } from '@/lib/notion/NotionClient'
 import { getModelWithKey, MODEL_META, DEFAULT_MODEL, type ModelId } from '@/lib/models'
 
+// ─── Request schema ──────────────────────────────────────────────────────────
+
+const MessageSchema = z.object({
+  role: z.enum(['user', 'assistant', 'system', 'tool']),
+  content: z.union([z.string(), z.array(z.record(z.string(), z.unknown()))]),
+})
+
+const RequestBodySchema = z.object({
+  messages: z.array(MessageSchema).min(1),
+})
+
 // ─── System prompt ────────────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `You are an AI assistant for NoteRunway, helping users manage their Notion workspace through natural conversation.
@@ -55,7 +66,25 @@ export async function POST(req: NextRequest) {
     ? requestedModel as ModelId
     : DEFAULT_MODEL
 
-  const { messages } = await req.json()
+  let rawBody: unknown
+  try {
+    rawBody = await req.json()
+  } catch {
+    return new Response(
+      JSON.stringify({ error: 'invalid_json' }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    )
+  }
+
+  const parsed = RequestBodySchema.safeParse(rawBody)
+  if (!parsed.success) {
+    return new Response(
+      JSON.stringify({ error: 'invalid_request', message: 'messages must be a non-empty array of {role, content} objects' }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    )
+  }
+
+  const { messages } = parsed.data
   const model = getModelWithKey(modelId, aiKey)
 
   const encoder = new TextEncoder()
