@@ -1,6 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
-import { resolve } from 'path'
+import { createRequire } from 'module'
 
 // Destructive tools that require explicit user approval before execution.
 // Matches against substrings of tool names (API-prefixed, from @notionhq/notion-mcp-server).
@@ -40,10 +40,15 @@ export class MCPClient {
   // This uses the user's Notion OAuth access token (ntn_xxx) directly — no
   // separate MCP OAuth flow required.
   async connect(): Promise<void> {
-    const serverBin = resolve(
-      process.cwd(),
-      'node_modules/@notionhq/notion-mcp-server/bin/cli.mjs'
-    )
+    const _require = createRequire(import.meta.url)
+    let serverBin: string
+    try {
+      serverBin = _require.resolve('@notionhq/notion-mcp-server/bin/cli.mjs')
+    } catch {
+      throw new MCPError(
+        'Cannot locate @notionhq/notion-mcp-server. Ensure the package is installed (`npm install`).'
+      )
+    }
 
     const transport = new StdioClientTransport({
       command: 'node',
