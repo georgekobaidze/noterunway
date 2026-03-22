@@ -1,11 +1,10 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+import { createRequire } from 'module'
 
-const NOTION_MCP_URL = 'https://mcp.notion.com'
-
-// Destructive tools that require explicit user approval before execution
-const DESTRUCTIVE_TOOLS = ['archive', 'delete', 'update', 'create', 'append', 'move', 'restore']
+// Destructive tools that require explicit user approval before execution.
+// Matches against substrings of tool names (API-prefixed, from @notionhq/notion-mcp-server).
+const DESTRUCTIVE_TOOLS = ['patch', 'post-page', 'delete-a-block', 'API-post-page', 'move-page', 'update-a-data-source', 'create-a-data-source']
 
 export interface MCPToolCall {
   tool: string
@@ -37,43 +36,33 @@ export class MCPClient {
     this.client = new Client({ name: 'noterunway', version: '0.1.0' })
   }
 
-  // Connect to Notion's hosted MCP server.
-  // Tries Streamable HTTP first (modern), falls back to SSE (legacy).
+  // Connect by spawning the local @notionhq/notion-mcp-server process via stdio.
+  // This uses the user's Notion OAuth access token (ntn_xxx) directly — no
+  // separate MCP OAuth flow required.
   async connect(): Promise<void> {
-    const headers = {
-      Authorization: `Bearer ${this.accessToken}`,
-      'User-Agent': 'NoteRunway/0.1.0',
-    }
-
+    const _require = createRequire(import.meta.url)
+    let serverBin: string
     try {
-      const transport = new StreamableHTTPClientTransport(
-        new URL(`${NOTION_MCP_URL}/mcp`),
-        { requestInit: { headers } }
+      serverBin = _require.resolve('@notionhq/notion-mcp-server/bin/cli.mjs')
+    } catch {
+      throw new MCPError(
+        'Cannot locate @notionhq/notion-mcp-server. Ensure the package is installed (`npm install`).'
       )
-      await this.client.connect(transport)
-    } catch (firstError) {
-      // Streamable HTTP failed — attempt SSE fallback
-      try {
-        const transport = new SSEClientTransport(
-          new URL(`${NOTION_MCP_URL}/sse`),
-          { requestInit: { headers } }
-        )
-        await this.client.connect(transport)
-      } catch (secondError) {
-        const firstMessage =
-          firstError instanceof Error ? firstError.message : String(firstError)
-        const secondMessage =
-          secondError instanceof Error ? secondError.message : String(secondError)
-        const error = new MCPError(
-          `Failed to connect to MCP server. ` +
-            `Streamable HTTP error: ${firstMessage}. ` +
-            `SSE fallback error: ${secondMessage}`
-        )
-        ;(error as any).cause = firstError
-        throw error
-      }
     }
 
+    const transport = new StdioClientTransport({
+      command: 'node',
+      args: [serverBin],
+      env: {
+        ...process.env,
+        NOTION_TOKEN: this.accessToken,
+        // Suppress info/debug logs from the child process so they don't pollute
+        // our SSE stream. The server writes logs to stderr which is discarded.
+        NODE_ENV: 'production',
+      },
+    })
+
+    await this.client.connect(transport)
     this.connected = true
   }
 

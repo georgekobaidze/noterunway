@@ -1,96 +1,64 @@
-import { generateObject } from 'ai'
+import { streamText, tool, stepCountIs } from 'ai'
 import { z } from 'zod'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
+import { MCPClient } from '@/lib/mcp/MCPClient'
 import { NotionClient } from '@/lib/notion/NotionClient'
 import { getModelWithKey, MODEL_META, DEFAULT_MODEL, type ModelId } from '@/lib/models'
 
-// ─── Request / Action types ───────────────────────────────────────────────────
+// ─── Request schema ──────────────────────────────────────────────────────────
 
-const ExecuteActionSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('archive'), pageId: z.string(), pageTitle: z.string() }),
-  z.object({ type: z.literal('create'), title: z.string(), content: z.string(), parentPageId: z.string() }),
-])
-
-const AskRequestSchema = z.object({
-  command: z.string().min(1),
-  phase: z.enum(['plan', 'execute']),
-  executeActions: z.array(ExecuteActionSchema).optional(),
+const MessageSchema = z.object({
+  role: z.enum(['user', 'assistant', 'system', 'tool']),
+  content: z.union([z.string(), z.array(z.record(z.string(), z.unknown()))]),
 })
 
-type AskRequest = z.infer<typeof AskRequestSchema>
-
-// ─── Zod schema for AI output ─────────────────────────────────────────────────
-
-const AskResultSchema = z.object({
-  mode: z.enum(['search', 'report', 'template', 'refactor', 'summarize', 'archive', 'chat']),
-  message: z.string().describe('Main response in markdown. Always populated.'),
-  // search
-  resultPageIds: z.array(z.string()).optional(),
-  // template
-  templateTitle: z.string().optional(),
-  templateContent: z.string().optional(),
-  templateParentTitle: z.string().optional(),
-  // refactor
-  targetPageId: z.string().optional(),
-  targetPageTitle: z.string().optional(),
-  // summarize
-  summarizedPageIds: z.array(z.string()).optional(),
-  // archive
-  archiveCandidates: z.array(z.object({
-    pageId: z.string(),
-    pageTitle: z.string(),
-    reason: z.string(),
-  })).optional(),
-})
-
-const RefactorSchema = z.object({
-  refactoredContent: z.string().describe('Full rewritten page content as markdown'),
-  reasoning: z.string(),
+const RequestBodySchema = z.object({
+  messages: z.array(MessageSchema).min(1),
 })
 
 // ─── System prompt ────────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are NoteRunway's AI assistant for Notion workspace management.
+const SYSTEM_PROMPT = `You are an AI assistant for NoteRunway, helping users manage their Notion workspace through natural conversation.
 
-The user gives a command and you receive their workspace page list (title + ID).
-Classify their intent and return a structured response.
+You have tools to read the workspace:
+- search_pages: search for pages by keyword or topic
+- get_page: read metadata of a specific page by its ID
+- get_page_content: read the actual text content/blocks of a page
+- run_analysis: run a built-in workspace analysis (dead_links, garbage, or workspace_stats)
 
-MODES:
-- search: Find pages matching keywords or criteria from the workspace
-- report: Generate a workspace health/insight analysis. Write a full markdown report in the message field.
-- template: Create a new well-structured Notion page. Populate templateTitle + templateContent (rich markdown with headers, bullets, tables).
-- refactor: Rewrite/restructure an existing page. Identify targetPageId from the page list.
-- summarize: Summarize the content of specific page(s). Identify summarizedPageIds.
-- archive: Identify pages to archive. Only suggest archiving when user explicitly asks or it's clearly appropriate.
-- chat: General response when command doesn't fit other modes.
+When asked to make changes (archive pages, create pages, update page content):
+1. Use search_pages to find the relevant page(s) first — you MUST have the real page ID before calling propose_actions
+2. Extract the page ID from the search results (it is in the "id" field of each result object)
+3. Call propose_actions with a structured list of changes — do not skip this step
+4. Briefly tell the user what you've proposed
 
-RULES:
-- Always populate the message field
-- For template mode: write rich, detailed content with headers, bullet points, tables as appropriate
-- For search: return only IDs of genuinely matching pages
-- Be honest when pages are not found or request can't be fulfilled
-- For refactor/summarize: identify the best matching page from the list`
+IMPORTANT for create actions:
+- Always search for the parent page first to get its ID
+- The parentPageId field MUST be the UUID from search results, not a name
+- The content field can be an empty string "" if the user wants a blank page
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
+IMPORTANT for archive actions:
+- Search for the page, extract its "id" field, and use that as pageId
+- The id is a UUID like "32bc3afc-3cbd-817a-83e6-f1a01cd30ab8"
 
-function getTitle(page: { properties: Record<string, { type: string; title?: Array<{ plain_text: string }> }> }): string {
-  const titleEntry = Object.values(page.properties).find((p) => p.type === 'title')
-  return titleEntry?.type === 'title'
-    ? titleEntry.title?.map((t) => t.plain_text).join('').trim() ?? ''
-    : ''
-}
+Rules:
+- Never skip propose_actions for any write operation
+- Never ask the user for a page ID — find it yourself with search_pages
+- Be concise — this is a terminal interface
+- When searching, prefer targeted queries over broad ones
+- For questions about orphaned pages, dead links, or stale pages — use run_analysis`
 
-// ─── POST /api/ask ────────────────────────────────────────────────────────────
+// ─── POST /api/ask — streaming agentic chat ───────────────────────────────────
 
 export async function POST(req: NextRequest) {
   const token = req.cookies.get('notion_token')?.value ?? null
   if (!token) {
-    return NextResponse.json({ error: 'not_connected' }, { status: 401 })
+    return new Response(JSON.stringify({ error: 'not_connected' }), { status: 401 })
   }
 
   const aiKey = req.headers.get('x-ai-key')
   if (!aiKey) {
-    return NextResponse.json({ error: 'missing_ai_key' }, { status: 400 })
+    return new Response(JSON.stringify({ error: 'missing_ai_key' }), { status: 400 })
   }
 
   const requestedModel = req.headers.get('x-ai-model')
@@ -98,134 +66,192 @@ export async function POST(req: NextRequest) {
     ? requestedModel as ModelId
     : DEFAULT_MODEL
 
+  let rawBody: unknown
   try {
-    const raw = await req.json().catch(() => null)
-    const parsed = AskRequestSchema.safeParse(raw)
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: 'invalid_request', details: parsed.error.flatten() },
-        { status: 400 },
-      )
-    }
-    const { command, phase, executeActions } = parsed.data
-
-    const notion = new NotionClient(token)
-
-    // ── Execute phase ──────────────────────────────────────────────────────────
-
-    if (phase === 'execute') {
-      if (!Array.isArray(executeActions) || executeActions.length === 0) {
-        return NextResponse.json({ error: 'missing_actions' }, { status: 400 })
-      }
-
-      const MAX_ACTIONS = 50
-      if (executeActions.length > MAX_ACTIONS) {
-        return NextResponse.json(
-          { error: `too_many_actions: max ${MAX_ACTIONS} per request` },
-          { status: 400 }
-        )
-      }
-
-      const results: string[] = []
-      const failedActions: string[] = []
-      const concurrency = 5
-
-      for (let i = 0; i < executeActions.length; i += concurrency) {
-        const batch = executeActions.slice(i, i + concurrency)
-        await Promise.all(
-          batch.map(async (action) => {
-            if (action.type === 'archive') {
-              try {
-                await notion.moveToArchive(action.pageId, 'ask', {
-                  title: action.pageTitle,
-                  reason: 'Archived via NoteRunway Ask',
-                })
-                results.push(`Archived: ${action.pageTitle}`)
-              } catch (err) {
-                const msg = err instanceof Error ? err.message : String(err)
-                failedActions.push(`archive "${action.pageTitle}" (${action.pageId}): ${msg}`)
-                console.error(`Execute action failed – archive "${action.pageTitle}":`, err)
-              }
-            } else if (action.type === 'create') {
-              try {
-                const pageId = await notion.createPage(action.title, action.content, action.parentPageId)
-                results.push(`Created page: ${action.title} (${pageId})`)
-              } catch (err) {
-                const msg = err instanceof Error ? err.message : String(err)
-                failedActions.push(`create "${action.title}": ${msg}`)
-                console.error(`Execute action failed – create "${action.title}":`, err)
-              }
-            } else {
-              const label = (action as { type: string }).type ?? 'unknown'
-              failedActions.push(`Unhandled action type: ${label}`)
-              console.warn('Unhandled execute action:', action)
-            }
-          })
-        )
-      }
-
-      return NextResponse.json({ success: true, results, failedActions })
-    }
-
-    // ── Plan phase ─────────────────────────────────────────────────────────────
-
-    const allPages = await notion.getAllPages()
-    const model = getModelWithKey(modelId, aiKey)
-
-    // Compact page list, capped at 200 to stay within context
-    type PageMeta = { id: string; title: string }
-    const pageMetas: PageMeta[] = allPages.slice(0, 200).map((p) => ({
-      id: p.id,
-      title: getTitle(p) || '(untitled)',
-    }))
-
-    const pageList = pageMetas.map((p) => `- ${p.title} (${p.id})`).join('\n')
-    const userPrompt = `User command: "${command}"\n\nWorkspace pages:\n${pageList}`
-
-    const { object: result } = await generateObject({
-      model,
-      schema: AskResultSchema,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.3,
-    })
-
-    // If refactor mode: fetch original text + generate rewritten content
-    let originalText = ''
-    let refactoredContent: string | undefined
-
-    if (result.mode === 'refactor' && result.targetPageId) {
-      originalText = await notion.getPageText(result.targetPageId)
-
-      const { object: refactorResult } = await generateObject({
-        model,
-        schema: RefactorSchema,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are rewriting a Notion page to be cleaner, more structured, and easier to read. Preserve all key information.',
-          },
-          {
-            role: 'user',
-            content: `Rewrite this page. Original title: "${result.targetPageTitle}"\n\nOriginal content:\n${originalText}`,
-          },
-        ],
-        temperature: 0.3,
-      })
-
-      refactoredContent = refactorResult.refactoredContent
-    }
-
-    return NextResponse.json({
-      ...result,
-      ...(refactoredContent !== undefined ? { refactoredContent } : {}),
-      pages: pageMetas,
-      originalText,
-    })
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    rawBody = await req.json()
+  } catch {
+    return new Response(
+      JSON.stringify({ error: 'invalid_json' }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    )
   }
+
+  const parsed = RequestBodySchema.safeParse(rawBody)
+  if (!parsed.success) {
+    return new Response(
+      JSON.stringify({ error: 'invalid_request', message: 'messages must be a non-empty array of {role, content} objects' }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    )
+  }
+
+  const { messages } = parsed.data
+  const model = getModelWithKey(modelId, aiKey)
+
+  const encoder = new TextEncoder()
+  const mcpClient = new MCPClient(token)
+  let stepCounter = 0
+  let mcpConnected = false
+
+  // Lazily connect MCP only when a tool actually fires
+  const ensureMcp = async () => {
+    if (!mcpConnected) {
+      await mcpClient.connect()
+      mcpConnected = true
+    }
+  }
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event: string, data: unknown) =>
+        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
+
+      try {
+        const result = streamText({
+          model,
+          system: SYSTEM_PROMPT,
+          messages,
+          stopWhen: stepCountIs(10),
+          tools: {
+            search_pages: tool({
+              description: 'Search for pages in the Notion workspace by keyword or topic',
+              inputSchema: z.object({
+                query: z.string().describe('Search query'),
+              }),
+              execute: async (input) => {
+                const stepId = `step-${++stepCounter}`
+                send('tool_start', { stepId, tool: 'search_pages', args: { query: input.query } })
+                await ensureMcp()
+                const r = await mcpClient.executeTool({
+                  tool: 'API-post-search',
+                  parameters: { query: input.query, filter: { value: 'page', property: 'object' } },
+                  approved: false,
+                })
+                send('tool_end', { stepId, tool: 'search_pages', success: r.success })
+                return r.success ? r.data : { error: r.error }
+              },
+            }),
+
+            get_page: tool({
+              description: 'Get the full content of a specific Notion page by its ID',
+              inputSchema: z.object({
+                page_id: z.string().describe('The Notion page ID'),
+              }),
+              execute: async (input) => {
+                const stepId = `step-${++stepCounter}`
+                send('tool_start', { stepId, tool: 'get_page', args: { page_id: input.page_id } })
+                await ensureMcp()
+                const r = await mcpClient.executeTool({
+                  tool: 'API-retrieve-a-page',
+                  parameters: { page_id: input.page_id },
+                  approved: false,
+                })
+                send('tool_end', { stepId, tool: 'get_page', success: r.success })
+                return r.success ? r.data : { error: r.error }
+              },
+            }),
+
+            get_page_content: tool({
+              description: 'Read the actual block content (text, bullets, headings) of a Notion page',
+              inputSchema: z.object({
+                page_id: z.string().describe('The Notion page ID'),
+              }),
+              execute: async (input) => {
+                const stepId = `step-${++stepCounter}`
+                send('tool_start', { stepId, tool: 'get_page_content', args: { page_id: input.page_id } })
+                await ensureMcp()
+                const r = await mcpClient.executeTool({
+                  tool: 'API-get-block-children',
+                  parameters: { block_id: input.page_id },
+                  approved: false,
+                })
+                send('tool_end', { stepId, tool: 'get_page_content', success: r.success })
+                return r.success ? r.data : { error: r.error }
+              },
+            }),
+
+            run_analysis: tool({
+              description: 'Run a workspace analysis. Use "dead_links" to find pages with broken/orphaned links, "garbage" to find stale/empty pages, or "workspace_stats" for a summary of the workspace.',
+              inputSchema: z.object({
+                type: z.enum(['dead_links', 'garbage', 'workspace_stats']).describe('Which analysis to run'),
+              }),
+              execute: async (input) => {
+                const stepId = `step-${++stepCounter}`
+                send('tool_start', { stepId, tool: 'run_analysis', args: { type: input.type } })
+                try {
+                  const notion = new NotionClient(token)
+                  let data: unknown
+                  if (input.type === 'dead_links') {
+                    data = await notion.getDeadLinks()
+                  } else if (input.type === 'garbage') {
+                    data = await notion.getGarbagePages()
+                  } else {
+                    data = await notion.getWorkspaceStats()
+                  }
+                  send('tool_end', { stepId, tool: 'run_analysis', success: true })
+                  return data
+                } catch (err) {
+                  const message = err instanceof Error ? err.message : 'Unknown error'
+                  send('tool_end', { stepId, tool: 'run_analysis', success: false })
+                  return { error: message }
+                }
+              },
+            }),
+
+            propose_actions: tool({
+              description: 'Propose write actions (archive, create, update pages) that require user approval before execution',
+              inputSchema: z.object({
+                summary: z.string().describe('Brief explanation of what you are proposing'),
+                actions: z.array(
+                  z.discriminatedUnion('type', [
+                    z.object({
+                      type: z.literal('archive'),
+                      pageId: z.string(),
+                      pageTitle: z.string(),
+                      reason: z.string(),
+                    }),
+                    z.object({
+                      type: z.literal('create'),
+                      parentPageId: z.string(),
+                      title: z.string(),
+                      content: z.string().default(''),
+                    }),
+                    z.object({
+                      type: z.literal('update'),
+                      pageId: z.string(),
+                      pageTitle: z.string(),
+                      content: z.string(),
+                    }),
+                  ])
+                ),
+              }),
+              execute: async (input) => {
+                send('propose_actions', { summary: input.summary, actions: input.actions })
+                return `Proposed ${input.actions.length} action(s). Awaiting user approval.`
+              },
+            }),
+          },
+        })
+
+        for await (const chunk of result.textStream) {
+          send('text', chunk)
+        }
+
+        send('done', {})
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error'
+        send('error', { message })
+      } finally {
+        await mcpClient.disconnect()
+        controller.close()
+      }
+    },
+  })
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      'X-Accel-Buffering': 'no',
+    },
+  })
 }
