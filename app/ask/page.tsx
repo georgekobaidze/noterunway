@@ -1,534 +1,422 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Sparkles, Copy, Check, ExternalLink, AlertTriangle, CheckSquare, Square } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
-import { CyberLoader } from '@/components/CyberLoader'
 import { useSettings } from '@/lib/hooks/useSettings'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type PageMeta = { id: string; title: string }
+type Action =
+  | { type: 'archive'; pageId: string; pageTitle: string; reason: string }
+  | { type: 'create'; parentPageId: string; title: string; content: string }
+  | { type: 'update'; pageId: string; pageTitle: string; content: string }
 
-type ArchiveCandidate = { pageId: string; pageTitle: string; reason: string }
+type ToolStep = {
+  stepId: string
+  tool: string
+  args: Record<string, unknown>
+  done: boolean
+  success?: boolean
+}
 
-interface AskResult {
-  mode: 'search' | 'report' | 'template' | 'refactor' | 'summarize' | 'archive' | 'chat'
-  message: string
-  resultPageIds?: string[]
-  templateTitle?: string
-  templateContent?: string
-  templateParentTitle?: string
-  targetPageId?: string
-  targetPageTitle?: string
-  refactoredContent?: string
-  summarizedPageIds?: string[]
-  archiveCandidates?: ArchiveCandidate[]
-  pages?: PageMeta[]
-  originalText?: string
+type ProposedActions = {
+  summary: string
+  actions: Action[]
+}
+
+type Message = {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  toolSteps: ToolStep[]
+  proposedActions?: ProposedActions
+  status: 'streaming' | 'done' | 'error'
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SUGGESTED_PROMPTS = [
-  'Generate a workspace health report',
-  'Create a weekly project tracker template',
-  'Find all pages about authentication',
-  'Summarize everything under Projects',
-  'Refactor my Q1 Planning page',
-  'What pages should I archive?',
+const SUGGESTIONS = [
+  'Find all pages related to authentication',
+  'Show me stale pages I should archive',
+  'Summarize my Q1 planning notes',
+  'Create a weekly standup template',
+  'What pages have no links to them?',
+  'Search for anything about onboarding',
 ]
 
-// ─── Small helpers ────────────────────────────────────────────────────────────
-
-function notionUrl(id: string) {
-  return `https://notion.so/${id.replace(/-/g, '')}`
+const TOOL_LABELS: Record<string, string> = {
+  search_pages: 'Searching workspace',
+  get_page: 'Reading page',
+  get_page_content: 'Reading page content',
+  run_analysis: 'Analyzing workspace',
+  propose_actions: 'Preparing actions',
 }
 
-function MarkdownBlock({ text }: { text: string }) {
-  return (
-    <div className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap font-sans">
-      {text.split('\n').map((line, i) => {
-        if (line.startsWith('# '))  return <h1 key={i} className="text-xl font-bold mt-4 mb-1">{line.slice(2)}</h1>
-        if (line.startsWith('## ')) return <h2 key={i} className="text-base font-bold mt-3 mb-1 text-[#00d4ff]">{line.slice(3)}</h2>
-        if (line.startsWith('### ')) return <h3 key={i} className="text-sm font-semibold mt-2 mb-0.5 text-purple-400">{line.slice(4)}</h3>
-        if (line.startsWith('- ') || line.startsWith('* ')) return <div key={i} className="flex gap-2"><span className="text-[#00d4ff] mt-0.5">•</span><span>{line.slice(2)}</span></div>
-        if (/^\d+\. /.test(line)) return <div key={i} className="flex gap-2"><span className="text-muted-foreground">{line.match(/^\d+/)?.[0]}.</span><span>{line.replace(/^\d+\. /, '')}</span></div>
-        if (line.trim() === '') return <div key={i} className="h-2" />
-        return <p key={i}>{line}</p>
-      })}
-    </div>
-  )
-}
-
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false)
-  const copy = useCallback(() => {
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }, [text])
-  return (
-    <button onClick={copy} className="neon-btn-ghost px-3 py-1.5 text-xs flex items-center gap-1.5">
-      {copied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
-    </button>
-  )
-}
-
-// ─── Result views ─────────────────────────────────────────────────────────────
-
-function SearchResult({ result }: { result: AskResult }) {
-  const pages = result.pages ?? []
-  const hits = (result.resultPageIds ?? [])
-    .map(id => pages.find(p => p.id === id))
-    .filter(Boolean) as PageMeta[]
-
-  return (
-    <div className="flex flex-col gap-3">
-      <p className="text-sm text-muted-foreground">{result.message}</p>
-      {hits.length === 0
-        ? <p className="text-sm text-muted-foreground/60 italic">No matching pages found.</p>
-        : hits.map(p => (
-          <a key={p.id} href={notionUrl(p.id)} target="_blank" rel="noopener noreferrer"
-            className="glass-card rounded-lg p-3 border border-white/5 hover:border-[#00d4ff]/30 flex items-center justify-between gap-3 transition-colors group">
-            <span className="text-sm font-medium">{p.title}</span>
-            <ExternalLink size={12} className="text-muted-foreground group-hover:text-[#00d4ff] shrink-0" />
-          </a>
-        ))
-      }
-    </div>
-  )
-}
-
-function ReportResult({ result, onSave }: { result: AskResult; onSave: () => void }) {
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="glass-card rounded-xl border border-white/5 p-5">
-        <MarkdownBlock text={result.message} />
-      </div>
-      <div className="flex gap-2">
-        <button onClick={onSave} className="neon-btn px-5 py-2 text-sm flex items-center gap-2">
-          <Sparkles size={13} /> Save to Notion
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function TemplateResult({
-  result, parentTitle, setParentTitle, onConfirm, executing,
-}: {
-  result: AskResult
-  parentTitle: string
-  setParentTitle: (v: string) => void
-  onConfirm: () => void
-  executing: boolean
-}) {
-  return (
-    <div className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground">{result.message}</p>
-      <div className="glass-card rounded-xl border border-[#00d4ff]/20 p-5 flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <h3 className="font-bold text-[#00d4ff]">{result.templateTitle}</h3>
-          <CopyButton text={result.templateContent ?? ''} />
-        </div>
-        <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono max-h-80 overflow-y-auto">
-          {result.templateContent}
-        </pre>
-      </div>
-      <div className="flex items-center gap-3">
-        <span className="text-xs text-muted-foreground shrink-0">Create under page:</span>
-        <input
-          value={parentTitle}
-          onChange={e => setParentTitle(e.target.value)}
-          placeholder={result.templateParentTitle ?? 'Type a parent page name…'}
-          className="flex-1 bg-transparent border border-white/10 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-[#00d4ff]/50"
-        />
-      </div>
-      <div className="flex gap-2">
-        <button onClick={onConfirm} disabled={!parentTitle.trim() || executing}
-          className="neon-btn px-5 py-2 text-sm flex items-center gap-2 disabled:opacity-40">
-          {executing ? <><span className="animate-spin">⠋</span> Creating…</> : <><Sparkles size={13} /> Create in Notion</>}
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function RefactorResult({ result }: { result: AskResult }) {
-  return (
-    <div className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground">{result.message}</p>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="glass-card rounded-xl border border-white/5 p-4 flex flex-col gap-2">
-          <div className="text-xs text-muted-foreground font-mono">ORIGINAL</div>
-          <pre className="text-xs whitespace-pre-wrap text-muted-foreground max-h-80 overflow-y-auto leading-relaxed">
-            {result.originalText || '(empty page)'}
-          </pre>
-        </div>
-        <div className="glass-card rounded-xl border border-[#00d4ff]/20 p-4 flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-[#00d4ff] font-mono">PROPOSED</div>
-            <CopyButton text={result.refactoredContent ?? ''} />
-          </div>
-          <pre className="text-xs whitespace-pre-wrap max-h-80 overflow-y-auto leading-relaxed">
-            {result.refactoredContent}
-          </pre>
-        </div>
-      </div>
-      <p className="text-xs text-muted-foreground/60">Copy the proposed content and paste it into Notion to apply the refactor.</p>
-    </div>
-  )
-}
-
-function ArchiveResult({
-  result, selected, onToggle, onArchive, executing,
-}: {
-  result: AskResult
-  selected: Set<string>
-  onToggle: (id: string) => void
-  onArchive: () => void
-  executing: boolean
-}) {
-  const candidates = result.archiveCandidates ?? []
-  return (
-    <div className="flex flex-col gap-3">
-      <p className="text-sm text-muted-foreground">{result.message}</p>
-      {candidates.length === 0
-        ? <p className="text-sm text-muted-foreground/60 italic">No archive candidates found.</p>
-        : candidates.map(c => (
-          <button key={c.pageId} onClick={() => onToggle(c.pageId)}
-            className="glass-card rounded-lg p-3 border border-white/5 hover:border-white/10 flex items-start gap-3 text-left transition-colors w-full">
-            {selected.has(c.pageId) ? <CheckSquare size={15} className="text-[#00d4ff] shrink-0 mt-0.5" /> : <Square size={15} className="text-muted-foreground shrink-0 mt-0.5" />}
-            <div>
-              <div className="text-sm font-medium">{c.pageTitle}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">{c.reason}</div>
-            </div>
-          </button>
-        ))
-      }
-      {candidates.length > 0 && (
-        <button onClick={onArchive} disabled={selected.size === 0 || executing}
-          className="neon-btn px-5 py-2 text-sm self-start flex items-center gap-2 disabled:opacity-40">
-          {executing ? <><span className="animate-spin">⠋</span> Archiving…</> : `Archive Selected (${selected.size})`}
-        </button>
-      )}
-    </div>
-  )
-}
-
-// ─── Save to Notion modal (inline) ────────────────────────────────────────────
-
-function SavePanel({
-  pages, content, title, onSave, executing,
-}: {
-  pages: PageMeta[]
-  content: string
-  title: string
-  onSave: (parentPageId: string, parentTitle: string) => void
-  executing: boolean
-}) {
-  const [query, setQuery] = useState('')
-  const matches = query.trim()
-    ? pages.filter(p => p.title.toLowerCase().includes(query.toLowerCase())).slice(0, 6)
-    : []
-  const exact = pages.find(p => p.title.toLowerCase() === query.toLowerCase())
-
-  return (
-    <div className="glass-card rounded-xl border border-[#00d4ff]/20 p-4 flex flex-col gap-3 mt-2">
-      <p className="text-xs text-muted-foreground">Type a parent page name to save under:</p>
-      <input
-        value={query}
-        onChange={e => setQuery(e.target.value)}
-        placeholder="e.g. Projects, Notes…"
-        className="bg-transparent border border-white/10 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-[#00d4ff]/50"
-      />
-      {matches.map(p => (
-        <button key={p.id} onClick={() => onSave(p.id, p.title)}
-          className="text-left text-sm px-3 py-1.5 rounded hover:bg-white/5 transition-colors">
-          {p.title}
-        </button>
-      ))}
-      {query.trim() && !exact && matches.length === 0 && (
-        <p className="text-xs text-muted-foreground/60">No matching page found.</p>
-      )}
-      {exact && (
-        <button onClick={() => onSave(exact.id, exact.title)} disabled={executing}
-          className="neon-btn px-4 py-1.5 text-sm self-start disabled:opacity-40">
-          {executing ? 'Saving…' : `Save under "${exact.title}"`}
-        </button>
-      )}
-    </div>
-  )
+const ACTION_ICONS: Record<string, string> = {
+  archive: '🗃',
+  create: '📄',
+  update: '✏️',
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AskPage() {
+  const [messages, setMessages] = useState<Message[]>([])
+  const [input, setInput] = useState('')
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [executingId, setExecutingId] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
   const { settings, aiKey } = useSettings()
-  const [command, setCommand] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [executing, setExecuting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<AskResult | null>(null)
-  const [executeMessage, setExecuteMessage] = useState<string | null>(null)
-  const [parentTitle, setParentTitle] = useState('')
-  const [selectedArchive, setSelectedArchive] = useState<Set<string>>(new Set())
-  const [showSavePanel, setShowSavePanel] = useState(false)
 
-  const pages = result?.pages ?? []
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
-  const headers = {
-    'Content-Type': 'application/json',
-    'x-ai-key': aiKey ?? '',
-    'x-ai-model': settings.modelId,
-  }
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
 
-  const handleSubmit = useCallback(async () => {
-    if (!command.trim() || loading) return
-    setLoading(true)
-    setError(null)
-    setResult(null)
-    setExecuteMessage(null)
-    setShowSavePanel(false)
+  const sendMessage = useCallback(async (text: string) => {
+    if (!text.trim() || isStreaming) return
+
+    const userMsg: Message = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: text.trim(),
+      toolSteps: [],
+      status: 'done',
+    }
+    const assistantMsgId = crypto.randomUUID()
+    const assistantMsg: Message = {
+      id: assistantMsgId,
+      role: 'assistant',
+      content: '',
+      toolSteps: [],
+      status: 'streaming',
+    }
+
+    setMessages(prev => [...prev, userMsg, assistantMsg])
+    setInput('')
+    setIsStreaming(true)
+
+    // Build conversation history (text-only) for the API
+    const history = [
+      ...messages
+        .filter(m => m.status === 'done')
+        .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+        .filter(m => m.content),
+      { role: 'user' as const, content: text.trim() },
+    ]
 
     try {
       const res = await fetch('/api/ask', {
         method: 'POST',
-        headers,
-        body: JSON.stringify({ command, phase: 'plan' }),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-ai-key': aiKey ?? '',
+          'x-ai-model': settings.modelId,
+        },
+        body: JSON.stringify({ messages: history }),
       })
-      const data: AskResult & { error?: string } = await res.json()
-      if (!res.ok) { setError(data.error ?? 'Request failed'); return }
-      setResult(data)
-      setParentTitle(data.templateParentTitle ?? '')
-      if (data.archiveCandidates) {
-        setSelectedArchive(new Set(data.archiveCandidates.map(c => c.pageId)))
+
+      if (!res.ok || !res.body) {
+        const err = await res.json().catch(() => ({ error: 'Request failed' }))
+        setMessages(prev => prev.map(m =>
+          m.id === assistantMsgId ? { ...m, content: `Error: ${err.error}`, status: 'error' } : m
+        ))
+        return
       }
-    } catch {
-      setError('Network error — check your connection.')
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+
+        // SSE events are separated by double newlines
+        const chunks = buffer.split('\n\n')
+        buffer = chunks.pop() ?? ''
+
+        for (const chunk of chunks) {
+          const lines = chunk.split('\n')
+          let eventType = ''
+          let dataStr = ''
+          for (const line of lines) {
+            if (line.startsWith('event: ')) eventType = line.slice(7).trim()
+            else if (line.startsWith('data: ')) dataStr = line.slice(6)
+          }
+          if (!eventType || !dataStr) continue
+
+          try {
+            const data = JSON.parse(dataStr)
+
+            if (eventType === 'text') {
+              setMessages(prev => prev.map(m =>
+                m.id === assistantMsgId ? { ...m, content: m.content + data } : m
+              ))
+            } else if (eventType === 'tool_start') {
+              setMessages(prev => prev.map(m =>
+                m.id === assistantMsgId
+                  ? { ...m, toolSteps: [...m.toolSteps, { stepId: data.stepId, tool: data.tool, args: data.args, done: false }] }
+                  : m
+              ))
+            } else if (eventType === 'tool_end') {
+              setMessages(prev => prev.map(m =>
+                m.id === assistantMsgId
+                  ? { ...m, toolSteps: m.toolSteps.map(s => s.stepId === data.stepId ? { ...s, done: true, success: data.success } : s) }
+                  : m
+              ))
+            } else if (eventType === 'propose_actions') {
+              setMessages(prev => prev.map(m =>
+                m.id === assistantMsgId
+                  ? { ...m, proposedActions: { summary: data.summary, actions: data.actions } }
+                  : m
+              ))
+            } else if (eventType === 'done') {
+              setMessages(prev => prev.map(m =>
+                m.id === assistantMsgId ? { ...m, status: 'done' } : m
+              ))
+            } else if (eventType === 'error') {
+              setMessages(prev => prev.map(m =>
+                m.id === assistantMsgId
+                  ? { ...m, content: m.content || `Error: ${data.message}`, status: 'error' }
+                  : m
+              ))
+            }
+          } catch {
+            // ignore malformed event data
+          }
+        }
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setMessages(prev => prev.map(m =>
+        m.id === assistantMsgId ? { ...m, content: `Error: ${message}`, status: 'error' } : m
+      ))
     } finally {
-      setLoading(false)
+      setIsStreaming(false)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [command, loading, aiKey, settings.modelId])
+  }, [messages, isStreaming, aiKey, settings.modelId])
 
-  const handleArchive = async () => {
-    if (!result?.archiveCandidates || selectedArchive.size === 0) return
-    setExecuting(true)
-    const actions = result.archiveCandidates
-      .filter(c => selectedArchive.has(c.pageId))
-      .map(c => ({ type: 'archive' as const, pageId: c.pageId, pageTitle: c.pageTitle, reason: c.reason }))
-
+  const handleApprove = useCallback(async (msgId: string, actions: Action[]) => {
+    setExecutingId(msgId)
     try {
-      const res = await fetch('/api/ask', {
+      const res = await fetch('/api/ask/execute', {
         method: 'POST',
-        headers,
-        body: JSON.stringify({ command, phase: 'execute', executeActions: actions }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actions }),
       })
       const data = await res.json()
-      if (!res.ok) { setError(data.error ?? 'Execute failed'); return }
-      setExecuteMessage(`✓ Archived ${actions.length} page${actions.length !== 1 ? 's' : ''} successfully.`)
-      setSelectedArchive(new Set())
-    } catch {
-      setError('Network error during execute.')
+
+      const lines = [
+        ...(data.results ?? []).map((r: string) => `✓ ${r}`),
+        ...(data.failedActions ?? []).map((r: string) => `✗ ${r}`),
+      ]
+
+      const resultMsg: Message = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: lines.join('\n') || 'Done.',
+        toolSteps: [],
+        status: 'done',
+      }
+
+      setMessages(prev => [
+        ...prev.map(m => m.id === msgId ? { ...m, proposedActions: undefined } : m),
+        resultMsg,
+      ])
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setMessages(prev => [
+        ...prev,
+        { id: crypto.randomUUID(), role: 'assistant', content: `Execution error: ${message}`, toolSteps: [], status: 'error' },
+      ])
     } finally {
-      setExecuting(false)
+      setExecutingId(null)
     }
+  }, [])
+
+  const handleReject = useCallback((msgId: string) => {
+    setMessages(prev => prev.map(m =>
+      m.id === msgId ? { ...m, proposedActions: undefined } : m
+    ))
+    setMessages(prev => [...prev, {
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      content: 'Actions cancelled.',
+      toolSteps: [],
+      status: 'done',
+    }])
+  }, [])
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    sendMessage(input)
   }
 
-  const handleCreate = async () => {
-    if (!result?.templateContent || !result.templateTitle || !parentTitle.trim()) return
-    const parentPage = pages.find(p => p.title.toLowerCase() === parentTitle.toLowerCase())
-    if (!parentPage) { setError(`Could not find page "${parentTitle}" in your workspace.`); return }
-    setExecuting(true)
-    try {
-      const res = await fetch('/api/ask', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          command, phase: 'execute',
-          executeActions: [{ type: 'create', title: result.templateTitle, content: result.templateContent, parentPageId: parentPage.id }],
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) { setError(data.error ?? 'Create failed'); return }
-      setExecuteMessage(`✓ Created "${result.templateTitle}" in Notion.`)
-    } catch {
-      setError('Network error during execute.')
-    } finally {
-      setExecuting(false)
-    }
-  }
-
-  const handleSaveReport = async (parentPageId: string, pTitle: string) => {
-    if (!result) return
-    setExecuting(true)
-    setShowSavePanel(false)
-    const title = result.mode === 'report' ? 'NoteRunway Workspace Report' : `Summary — ${new Date().toLocaleDateString()}`
-    try {
-      const res = await fetch('/api/ask', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          command, phase: 'execute',
-          executeActions: [{ type: 'create', title, content: result.message, parentPageId }],
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) { setError(data.error ?? 'Save failed'); return }
-      setExecuteMessage(`✓ Saved "${title}" under "${pTitle}" in Notion.`)
-    } catch {
-      setError('Network error during save.')
-    } finally {
-      setExecuting(false)
-    }
-  }
-
-  const hasKey = !!aiKey
+  const noKey = !aiKey
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar rightSlot={<Link href="/settings" className="neon-btn-ghost px-8 py-3 text-sm">Settings</Link>} />
 
-      <main className="flex-1 flex flex-col px-6 py-6 gap-6 max-w-4xl mx-auto w-full">
+      <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-4 py-4 gap-3">
+        <Link href="/dashboard" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-[#00d4ff] transition-colors w-fit">
+          <ArrowLeft size={12} /> Dashboard
+        </Link>
 
-        {/* Header */}
-        <div className="flex flex-col gap-1">
-          <Link href="/dashboard" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-[#00d4ff] transition-colors w-fit mb-2">
-            <ArrowLeft size={12} /> Dashboard
-          </Link>
-          <h1 className="text-2xl font-bold neon-text" style={{ fontFamily: 'var(--font-orbitron), sans-serif' }}>
-            Semantic Ask
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Natural language workspace commands — generate reports, create templates, search pages, and more.
-          </p>
-        </div>
-
-        {/* AI key warning */}
-        {!hasKey && (
-          <div className="glass-card rounded-xl p-4 border border-amber-400/30 flex items-start gap-3">
-            <AlertTriangle size={15} className="text-amber-400 shrink-0 mt-0.5" />
-            <p className="text-sm text-amber-400">
-              No AI key configured. <Link href="/settings" className="underline hover:text-amber-300">Add your key in Settings</Link> to use Semantic Ask.
-            </p>
-          </div>
-        )}
-
-        {/* Command box */}
-        <div className="glass-card rounded-xl border border-white/5 p-6 flex flex-col gap-4">
-          <textarea
-            rows={3}
-            value={command}
-            onChange={e => setCommand(e.target.value)}
-            onKeyDown={e => {
-              if (!hasKey) return
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmit()
-            }}
-            placeholder="Ask anything about your workspace…"
-            className="w-full bg-transparent border border-white/10 rounded-lg p-4 text-sm resize-none focus:outline-none focus:border-[#00d4ff]/50 placeholder:text-muted-foreground"
-            disabled={loading}
-          />
-
-          {/* Suggested prompts */}
-          <div className="flex flex-wrap gap-2">
-            {SUGGESTED_PROMPTS.map(p => (
-              <button key={p} onClick={() => setCommand(p)}
-                className="text-xs px-3 py-1.5 rounded-full border border-white/10 text-muted-foreground hover:border-[#00d4ff]/40 hover:text-[#00d4ff] transition-colors">
-                ✦ {p}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">⌘+Enter to submit</span>
-            <button onClick={handleSubmit} disabled={!command.trim() || loading || !hasKey}
-              className="neon-btn px-6 py-2 flex items-center gap-2 disabled:opacity-40">
-              {loading ? <><span className="animate-spin">⠋</span> Thinking…</> : <><Sparkles size={14} /> Ask</>}
-            </button>
-          </div>
-        </div>
-
-        {/* Loading */}
-        {loading && (
-          <div className="glass-card rounded-xl p-10 border border-white/5 flex flex-col items-center gap-4">
-            <CyberLoader />
-            <p className="text-xs font-mono text-muted-foreground">Analysing workspace…</p>
-          </div>
-        )}
-
-        {/* Error */}
-        {error && (
-          <div className="glass-card rounded-xl p-4 border border-red-400/30 flex items-start gap-3">
-            <AlertTriangle size={15} className="text-red-400 shrink-0 mt-0.5" />
-            <p className="text-sm text-red-400">{error}</p>
-          </div>
-        )}
-
-        {/* Execute success */}
-        {executeMessage && (
-          <div className="glass-card rounded-xl p-4 border border-green-400/30 flex items-center gap-3">
-            <Check size={15} className="text-green-400 shrink-0" />
-            <p className="text-sm text-green-400">{executeMessage}</p>
-          </div>
-        )}
-
-        {/* Result */}
-        {result && !loading && (
-          <div className="glass-card rounded-xl border border-white/5 p-6 flex flex-col gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-[#00d4ff]/30 text-[#00d4ff] bg-[#00d4ff]/10 uppercase tracking-widest">
-                {result.mode}
-              </span>
+        {/* Terminal window */}
+        <div
+          className="flex-1 flex flex-col rounded-xl border border-white/10 bg-black/60 overflow-hidden font-mono text-sm"
+          style={{ minHeight: 'calc(100vh - 160px)' }}
+        >
+          {/* Title bar */}
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/5 bg-white/[0.02] shrink-0">
+            <div className="flex gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-red-500/50" />
+              <div className="w-3 h-3 rounded-full bg-yellow-500/50" />
+              <div className="w-3 h-3 rounded-full bg-green-500/50" />
             </div>
+            <span className="text-xs text-muted-foreground/50 ml-2 tracking-wide">noterunway — ask</span>
+          </div>
 
-            {result.mode === 'search' && <SearchResult result={result} />}
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-5 space-y-5">
 
-            {(result.mode === 'report' || result.mode === 'summarize') && (
-              <>
-                <ReportResult result={result} onSave={() => setShowSavePanel(v => !v)} />
-                {showSavePanel && (
-                  <SavePanel pages={pages} content={result.message} title="Report" onSave={handleSaveReport} executing={executing} />
-                )}
-              </>
-            )}
-
-            {result.mode === 'template' && (
-              <TemplateResult
-                result={result}
-                parentTitle={parentTitle}
-                setParentTitle={setParentTitle}
-                onConfirm={handleCreate}
-                executing={executing}
-              />
-            )}
-
-            {result.mode === 'refactor' && <RefactorResult result={result} />}
-
-            {result.mode === 'archive' && (
-              <ArchiveResult
-                result={result}
-                selected={selectedArchive}
-                onToggle={id => setSelectedArchive(prev => {
-                  const next = new Set(prev)
-                  next.has(id) ? next.delete(id) : next.add(id)
-                  return next
-                })}
-                onArchive={handleArchive}
-                executing={executing}
-              />
-            )}
-
-            {result.mode === 'chat' && (
-              <div className="glass-card rounded-xl border border-white/5 p-5">
-                <MarkdownBlock text={result.message} />
+            {messages.length === 0 && (
+              <div className="flex flex-col gap-5 py-4">
+                <div className="text-xs text-muted-foreground/40 leading-relaxed">
+                  Ask anything about your Notion workspace. I can search, read, summarize, and propose changes.
+                </div>
+                <div className="flex flex-col gap-1">
+                  {SUGGESTIONS.map(s => (
+                    <button key={s} onClick={() => sendMessage(s)}
+                      className="text-left text-xs text-muted-foreground/40 hover:text-[#00d4ff]/70 transition-colors py-0.5 w-fit">
+                      <span className="text-muted-foreground/20 mr-2">$</span>{s}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
-          </div>
-        )}
 
+            {messages.map(msg => (
+              <div key={msg.id} className="flex flex-col gap-1.5">
+                {msg.role === 'user' ? (
+                  <div className="flex gap-2.5 items-start">
+                    <span className="text-[#00d4ff] shrink-0 mt-px">❯</span>
+                    <span className="text-white/90 leading-relaxed">{msg.content}</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2 pl-5">
+                    {/* Tool call steps */}
+                    {msg.toolSteps.map(step => (
+                      <div key={step.stepId} className="flex items-center gap-2 text-xs text-muted-foreground/40">
+                        {step.done
+                          ? (step.success
+                            ? <span className="text-green-500/50">✓</span>
+                            : <span className="text-red-500/50">✗</span>)
+                          : <span className="animate-spin inline-block text-[#00d4ff]/40">⠋</span>
+                        }
+                        <span>{TOOL_LABELS[step.tool] ?? step.tool}</span>
+                        {step.args.query != null && (
+                          <span className="text-muted-foreground/25">&quot;{String(step.args.query)}&quot;</span>
+                        )}
+                        {step.args.page_id != null && (
+                          <span className="text-muted-foreground/25">{String(step.args.page_id).slice(0, 8)}…</span>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* AI response text */}
+                    {msg.content && (
+                      <div className={`leading-relaxed whitespace-pre-wrap text-sm ${
+                        msg.status === 'error' ? 'text-red-400/70' : 'text-foreground/80'
+                      }`}>
+                        {msg.content}
+                        {msg.status === 'streaming' && (
+                          <span className="animate-pulse ml-0.5 text-[#00d4ff]">█</span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Proposed actions approval card */}
+                    {msg.proposedActions && (
+                      <div className="mt-1 border border-amber-500/25 rounded-lg p-3.5 bg-amber-500/5">
+                        <div className="text-xs text-amber-400/60 font-semibold uppercase tracking-widest mb-2.5">
+                          Proposed actions
+                        </div>
+                        <div className="flex flex-col gap-1.5 mb-3.5">
+                          {msg.proposedActions.actions.map((a, i) => (
+                            <div key={i} className="flex items-start gap-2 text-xs">
+                              <span className="shrink-0 mt-px">{ACTION_ICONS[a.type] ?? '•'}</span>
+                              <div className="text-muted-foreground/70">
+                                <span className="text-amber-300/70 mr-1.5">{a.type}</span>
+                                <span>{'pageTitle' in a ? a.pageTitle : ('title' in a ? a.title : '')}</span>
+                                {'reason' in a && (
+                                  <span className="text-muted-foreground/35 ml-1.5">— {a.reason}</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleApprove(msg.id, msg.proposedActions!.actions)}
+                            disabled={executingId === msg.id}
+                            className="neon-btn px-4 py-1.5 text-xs disabled:opacity-40 flex items-center gap-1.5"
+                          >
+                            {executingId === msg.id
+                              ? <><span className="animate-spin">⠋</span> Executing…</>
+                              : `Confirm (${msg.proposedActions.actions.length})`}
+                          </button>
+                          <button
+                            onClick={() => handleReject(msg.id)}
+                            disabled={executingId === msg.id}
+                            className="neon-btn-ghost px-4 py-1.5 text-xs disabled:opacity-40"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            <div ref={bottomRef} />
+          </div>
+
+          {/* Input */}
+          <div className="border-t border-white/5 px-5 py-3.5 shrink-0">
+            {noKey ? (
+              <p className="text-xs text-amber-400/60">
+                ⚠ No AI key configured.{' '}
+                <Link href="/settings" className="underline hover:text-amber-400">Add one in Settings</Link>
+              </p>
+            ) : (
+              <form onSubmit={handleSubmit} className="flex items-center gap-2.5">
+                <span className="text-[#00d4ff] shrink-0">❯</span>
+                <input
+                  ref={inputRef}
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  disabled={isStreaming}
+                  placeholder={isStreaming ? '' : 'Ask anything about your workspace…'}
+                  className="flex-1 bg-transparent outline-none text-white/90 placeholder:text-muted-foreground/25 disabled:opacity-40 text-sm"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </form>
+            )}
+          </div>
+        </div>
       </main>
     </div>
   )
