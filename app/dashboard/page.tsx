@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Navbar } from '@/components/Navbar'
 import { CyberLoader } from '@/components/CyberLoader'
-import { GitMerge, Trash2, Network, Database, Sparkles, AlertTriangle, RefreshCw, ScanSearch, Link2Off, ShieldAlert } from 'lucide-react'
+import { GitMerge, Trash2, Network, Sparkles, AlertTriangle, RefreshCw, ScanSearch, Link2Off, ShieldAlert } from 'lucide-react'
 import type { WorkspaceStats } from '@/lib/notion/NotionClient'
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
@@ -237,7 +237,7 @@ export default function DashboardPage() {
             >
               Deep Scans
             </h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <StatCard
                 label="Empty Pages"
                 value={emptyPages}
@@ -299,13 +299,6 @@ export default function DashboardPage() {
                 title="Dependency Graph"
                 description="Interactive graph of all linked notes and tasks."
                 tag="visual"
-              />
-              <FeatureLink
-                href="/query"
-                icon={<Database size={20} />}
-                title="SQL Query"
-                description="Query your workspace with SQL-like syntax."
-                tag="query"
               />
               <FeatureLink
                 href="/ask"
