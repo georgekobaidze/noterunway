@@ -70,9 +70,12 @@ export default function Home() {
       <NetworkBackground />
 
       <Navbar rightSlot={
-        connected
-          ? <Link href="/dashboard" className="neon-btn px-8 py-3 text-sm">Go to Dashboard →</Link>
-          : <Link href="/settings" className="neon-btn px-8 py-3 text-sm">Connect Notion →</Link>
+        <div className="flex items-center gap-4">
+          {connected
+            ? <Link href="/dashboard" className="neon-btn px-8 py-3 text-sm">Go to Dashboard →</Link>
+            : <Link href="/settings" className="neon-btn px-8 py-3 text-sm">Connect Notion →</Link>
+          }
+        </div>
       } />
 
       {/* Hero */}
@@ -88,9 +91,7 @@ export default function Home() {
         </h1>
 
         <p className="text-muted-foreground text-lg max-w-2xl mb-10 leading-relaxed">
-          AI-powered duplicate detection, garbage collection, dependency graphs, and
-          natural language instructions — all with human-in-the-loop approval before
-          anything changes.
+          Your workspace. Analyzed. Cleaned. Understood. <span className="neon-text">NoteRunway</span> connects AI to your Notion via MCP — and never moves a single page without your say-so.
         </p>
 
         <TerminalDemo />
