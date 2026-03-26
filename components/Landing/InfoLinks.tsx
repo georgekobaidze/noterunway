@@ -42,7 +42,8 @@ export function InfoLinks() {
           <button
             key={id}
             onClick={() => openPanel(id)}
-            className="group flex items-center gap-0 font-mono text-xs cursor-pointer select-none"
+            className="group flex items-center gap-0 text-xs cursor-pointer select-none"
+            style={{ fontFamily: 'var(--font-orbitron, Orbitron, sans-serif)', letterSpacing: '0.1em', textTransform: 'uppercase' }}
           >
             <span className="transition-all duration-200 text-[#00d4ff]/50 group-hover:text-[#00d4ff]">[</span>
             <span className="px-1.5 transition-all duration-200 text-[#00d4ff]/80 group-hover:text-[#00d4ff]" style={{ textShadow: undefined }}>
@@ -74,7 +75,7 @@ export function InfoLinks() {
             style={{
               position: 'relative',
               width: '100%',
-              maxWidth: '32rem',
+              maxWidth: '52rem',
               margin: '0 1rem',
               borderRadius: '0.75rem',
               overflow: 'hidden',
@@ -96,16 +97,16 @@ export function InfoLinks() {
             >
               <h2
                 className="text-sm font-bold tracking-widest uppercase"
-                style={{ color: '#00d4ff', textShadow: '0 0 16px rgba(0,212,255,0.7)', fontFamily: 'monospace' }}
+                style={{ color: '#00d4ff', textShadow: '0 0 16px rgba(0,212,255,0.7)', fontFamily: 'var(--font-orbitron, Orbitron, sans-serif)' }}
               >
                 {LABELS[open]}
               </h2>
               <button
                 onClick={closePanel}
                 className="text-2xl leading-none cursor-pointer transition-colors duration-150"
-                style={{ color: 'rgba(255,255,255,0.3)' }}
+                style={{ color: 'rgba(255,255,255,0.8)' }}
                 onMouseEnter={e => (e.currentTarget.style.color = '#00d4ff')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.3)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.8)')}
                 aria-label="Close"
               >
                 &#215;
@@ -130,33 +131,72 @@ export function InfoLinks() {
 
 function BuiltByContent() {
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-4">
-        <div
-          className="w-14 h-14 rounded-full flex items-center justify-center text-base font-bold shrink-0"
-          style={{ background: 'rgba(0,212,255,0.1)', border: '2px solid rgba(0,212,255,0.4)', color: '#00d4ff' }}
-        >
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '0.5rem 0' }}>
+
+      {/* Profile */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', paddingBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{
+          width: 80, height: 80, borderRadius: '50%', flexShrink: 0,
+          background: 'rgba(0,212,255,0.1)', border: '3px solid #00d4ff',
+          boxShadow: '0 0 20px rgba(0,212,255,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '1.25rem', fontWeight: 700, color: '#00d4ff',
+        }}>
           GK
         </div>
-        <div>
-          <p className="font-semibold text-white text-base">Giorgi Kobaidze</p>
-          <p className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>Principal Software Engineer</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <h2 style={{ margin: 0, fontFamily: 'var(--font-orbitron, monospace)', fontSize: '1.25rem', color: '#00d4ff', textShadow: '0 0 10px rgba(0,212,255,0.5)', letterSpacing: 1 }}>
+            Giorgi Kobaidze
+          </h2>
+          <p style={{ margin: 0, fontSize: '1rem', color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>
+            Principal Software Engineer
+          </p>
         </div>
       </div>
 
-      <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>
-        Built for the <span style={{ color: '#00d4ff' }}>DEV × Notion MCP Challenge</span>. I obsess over clean tools and sharp interfaces — NoteRunway is what I'd actually want in my own workflow.
-      </p>
+      {/* About Me */}
+      <Section title="About Me">
+        <BlockText>
+          Passionate about a few things and all-in on every one of them. I build with the same care I brew coffee: strong and clean. Always aiming to be the main pilot in what I do, never just a passenger.
+        </BlockText>
+      </Section>
 
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1.25rem' }}>
-        <p className="text-xs font-mono mb-4" style={{ color: 'rgba(255,255,255,0.3)', letterSpacing: '0.1em' }}>FIND ME ONLINE</p>
-        <div className="flex flex-wrap gap-3">
-          <SocialBtn href="https://github.com/georgekobaidze"         icon={<Github   size={15} />} label="GitHub"   />
-          <SocialBtn href="https://www.linkedin.com/in/giorgikobaidze/" icon={<Linkedin size={15} />} label="LinkedIn" />
-          <SocialBtn href="https://x.com/georgekobaidze"              icon={<Twitter  size={15} />} label="X / Twitter" />
-          <SocialBtn href="https://dev.to/georgekobaidze"             icon={<BookOpen size={15} />} label="DEV.to"  />
+      {/* Connect */}
+      <Section title="Connect">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+          <SocialBtn href="https://github.com/georgekobaidze"            icon={<Github   size={15} />} label="GitHub"     />
+          <SocialBtn href="https://www.linkedin.com/in/giorgikobaidze/"  icon={<Linkedin size={15} />} label="LinkedIn"   />
+          <SocialBtn href="https://x.com/georgekobaidze"                 icon={<Twitter  size={15} />} label="X / Twitter"/>
+          <SocialBtn href="https://dev.to/georgekobaidze"                icon={<BookOpen size={15} />} label="DEV.to"     />
         </div>
-      </div>
+      </Section>
+
+      {/* Project Purpose */}
+      <Section title="Project Purpose">
+        <BlockText>
+          What started as a DEV × Notion MCP Challenge submission quickly turned into one of the most interesting projects I've built. NoteRunway brings AI-powered workspace intelligence to Notion — without ever acting on your data without your explicit approval.
+        </BlockText>
+        <BlockText>
+          The idea is simple: your Notion workspace accumulates cruft over time — duplicates, dead links, orphaned pages, leaked secrets. NoteRunway finds all of it, explains what it found, and only moves when you say go. Every destructive action is human-approved.
+        </BlockText>
+        <BlockText>
+          I built NoteRunway because it's the tool I'd actually want in my own workflow. If you feel the same way, I hope you enjoy it — and I'd love to hear what you think.
+        </BlockText>
+        <p style={{ margin: '0.5rem 0 0 0', fontSize: '1rem', color: 'rgba(255,255,255,0.6)', fontStyle: 'italic' }}>
+          And that's not all — there are many more features planned for the future.
+        </p>
+      </Section>
+
+      {/* Privacy */}
+      <Section title="Privacy & Data">
+        <BlockText>
+          NoteRunway never stores your Notion data. Your integration token is kept in an httpOnly cookie and used only to make API calls on your behalf. No page content, no tokens, no analytics — nothing is persisted server-side.
+        </BlockText>
+        <BlockText>
+          All AI processing happens in-memory per request. Your AI provider key is stored locally in your browser and is never sent to NoteRunway's servers.
+        </BlockText>
+      </Section>
+
     </div>
   )
 }
@@ -229,14 +269,46 @@ function WhatsNextContent() {
 
 /* ── Shared sub-components ───────────────────────────────────── */
 
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+      <h3 style={{
+        margin: 0, padding: '0 0 0.4rem 0',
+        fontFamily: 'var(--font-orbitron, monospace)',
+        fontSize: '0.85rem', color: '#00d4ff',
+        textTransform: 'uppercase', letterSpacing: '1px',
+        borderBottom: '2px solid rgba(0,212,255,0.3)',
+      }}>
+        {title}
+      </h3>
+      {children}
+    </div>
+  )
+}
+
+function BlockText({ children }: { children: React.ReactNode }) {
+  return (
+    <p style={{
+      margin: 0, padding: '0.5rem 0.75rem',
+      background: 'rgba(0,212,255,0.05)',
+      borderLeft: '3px solid #00d4ff',
+      borderRadius: '0 4px 4px 0',
+      fontSize: '1rem', lineHeight: 1.7,
+      color: 'rgba(255,255,255,0.9)',
+    }}>
+      {children}
+    </p>
+  )
+}
+
 function SocialBtn({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer"
-      style={{ background: 'rgba(0,212,255,0.06)', border: '1px solid rgba(0,212,255,0.2)', color: 'rgba(255,255,255,0.55)' }}
+      className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer"
+      style={{ background: 'rgba(0,212,255,0.06)', border: '1px solid rgba(0,212,255,0.2)', color: 'rgba(255,255,255,0.9)' }}
       onMouseEnter={e => {
         const el = e.currentTarget
         el.style.background = 'rgba(0,212,255,0.15)'
@@ -247,7 +319,7 @@ function SocialBtn({ href, icon, label }: { href: string; icon: React.ReactNode;
         const el = e.currentTarget
         el.style.background = 'rgba(0,212,255,0.06)'
         el.style.borderColor = 'rgba(0,212,255,0.2)'
-        el.style.color = 'rgba(255,255,255,0.55)'
+        el.style.color = 'rgba(255,255,255,0.9)'
       }}
     >
       {icon} {label}
