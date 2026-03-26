@@ -1,188 +1,287 @@
 'use client'
 
-import { useState } from 'react'
-import { X, Github, Linkedin, Twitter, BookOpen } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { Github, Linkedin, Twitter, BookOpen } from 'lucide-react'
 
-type Panel = 'built-by' | 'contribute' | 'whats-next' | null
+type Panel = 'built-by' | 'contribute' | 'whats-next'
+
+const LABELS: Record<Panel, string> = {
+  'built-by': 'Built By',
+  'contribute': 'Contribute',
+  'whats-next': "What's Next?",
+}
 
 export function InfoLinks() {
-  const [open, setOpen] = useState<Panel>(null)
+  const [open, setOpen] = useState<Panel | null>(null)
+  const [visible, setVisible] = useState(false)
 
-  const toggle = (panel: Panel) => setOpen(prev => prev === panel ? null : panel)
-  const close = () => setOpen(null)
+  const openPanel = (id: Panel) => {
+    setOpen(id)
+    // next tick so the element is mounted before the transition fires
+    requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)))
+  }
+
+  const closePanel = () => {
+    setVisible(false)
+    setTimeout(() => setOpen(null), 300)
+  }
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') closePanel() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   return (
     <>
-      {/* Links row */}
-      <div className="flex items-center gap-1 font-mono text-xs">
-        {(['built-by', 'contribute', 'whats-next'] as const).map((id, i) => (
-          <span key={id} className="flex items-center gap-1">
-            {i > 0 && <span className="text-white/10">|</span>}
-            <button
-              onClick={() => toggle(id)}
-              className={`px-2 py-1 rounded transition-colors relative group ${
-                open === id ? 'text-[#00d4ff]' : 'text-muted-foreground/50 hover:text-[#00d4ff]'
-              }`}
-            >
-              {id === 'built-by' ? 'Built By' : id === 'contribute' ? 'Contribute' : "What's Next?"}
-              <span className={`absolute bottom-0 left-1/2 -translate-x-1/2 h-px bg-[#00d4ff] transition-all duration-300 ${
-                open === id ? 'w-4/5' : 'w-0 group-hover:w-4/5'
-              }`} />
-            </button>
-          </span>
+      {/* Nav links */}
+      <nav className="flex items-center gap-3">
+        {(['built-by', 'contribute', 'whats-next'] as Panel[]).map((id) => (
+          <button
+            key={id}
+            onClick={() => openPanel(id)}
+            className="group flex items-center gap-0 font-mono text-xs cursor-pointer select-none"
+          >
+            <span className="transition-all duration-200 text-[#00d4ff]/50 group-hover:text-[#00d4ff]">[</span>
+            <span className="px-1.5 transition-all duration-200 text-[#00d4ff]/80 group-hover:text-[#00d4ff]" style={{ textShadow: undefined }}>
+              {LABELS[id]}
+            </span>
+            <span className="transition-all duration-200 text-[#00d4ff]/50 group-hover:text-[#00d4ff]">]</span>
+          </button>
         ))}
-      </div>
+      </nav>
 
-      {/* Modal */}
-      {open && (
+      {open && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)' }}
-          onClick={close}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.85)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
+            opacity: visible ? 1 : 0,
+            transition: 'opacity 0.3s ease',
+          }}
+          onClick={closePanel}
         >
           <div
-            className="relative w-full max-w-md mx-4 rounded-xl overflow-hidden"
             style={{
-              background: 'rgba(21,25,34,0.95)',
-              backdropFilter: 'blur(10px)',
+              position: 'relative',
+              width: '100%',
+              maxWidth: '32rem',
+              margin: '0 1rem',
+              borderRadius: '0.75rem',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              maxHeight: '85vh',
+              background: '#0d1117',
               border: '2px solid #00d4ff',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.5), inset 0 0 20px rgba(0,212,255,0.05)',
+              boxShadow: '0 0 40px rgba(0,212,255,0.15), 0 24px 48px rgba(0,0,0,0.8)',
+              transform: visible ? 'scale(1)' : 'scale(0.9)',
+              transition: 'transform 0.3s ease',
             }}
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#00d4ff]/20"
-              style={{ background: 'rgba(0,212,255,0.05)' }}>
-              <h3 className="text-sm font-bold tracking-widest text-[#00d4ff] uppercase"
-                style={{ fontFamily: 'var(--font-orbitron), sans-serif', textShadow: '0 0 20px rgba(0,212,255,0.8)' }}>
-                {open === 'built-by' ? 'Built By' : open === 'contribute' ? 'Contribute' : "What's Next?"}
-              </h3>
-              <button onClick={close} className="text-muted-foreground/50 hover:text-[#00d4ff] transition-colors text-xl leading-none">×</button>
+            <div
+              className="flex items-center justify-between px-6 py-4 shrink-0"
+              style={{ background: 'rgba(0,212,255,0.06)', borderBottom: '1px solid rgba(0,212,255,0.2)' }}
+            >
+              <h2
+                className="text-sm font-bold tracking-widest uppercase"
+                style={{ color: '#00d4ff', textShadow: '0 0 16px rgba(0,212,255,0.7)', fontFamily: 'monospace' }}
+              >
+                {LABELS[open]}
+              </h2>
+              <button
+                onClick={closePanel}
+                className="text-2xl leading-none cursor-pointer transition-colors duration-150"
+                style={{ color: 'rgba(255,255,255,0.3)' }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#00d4ff')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.3)')}
+                aria-label="Close"
+              >
+                &#215;
+              </button>
             </div>
 
             {/* Body */}
-            <div className="px-6 py-6">
-              {open === 'built-by' && <BuiltByPanel />}
-              {open === 'contribute' && <ContributePanel />}
-              {open === 'whats-next' && <WhatsNextPanel />}
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 border-t border-[#00d4ff]/10 flex justify-end"
-              style={{ background: 'rgba(0,0,0,0.2)' }}>
-              <button
-                onClick={close}
-                className="px-6 py-1.5 rounded border-2 border-[#00d4ff]/30 text-muted-foreground/60 text-xs font-mono hover:border-[#00d4ff] hover:text-[#00d4ff] transition-all hover:-translate-y-px"
-              >
-                Close
-              </button>
+            <div className="overflow-y-auto flex-1 px-6 py-6">
+              {open === 'built-by'   && <BuiltByContent />}
+              {open === 'contribute' && <ContributeContent />}
+              {open === 'whats-next' && <WhatsNextContent />}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )
 }
 
-function BuiltByPanel() {
+/* ── Panel contents ─────────────────────────────────────────── */
+
+function BuiltByContent() {
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-full border-2 border-[#00d4ff]/40 flex items-center justify-center text-[#00d4ff] font-bold shrink-0"
-          style={{ background: 'rgba(0,212,255,0.08)' }}>
+        <div
+          className="w-14 h-14 rounded-full flex items-center justify-center text-base font-bold shrink-0"
+          style={{ background: 'rgba(0,212,255,0.1)', border: '2px solid rgba(0,212,255,0.4)', color: '#00d4ff' }}
+        >
           GK
         </div>
         <div>
-          <p className="font-semibold text-foreground">Giorgi Kobaidze</p>
-          <p className="text-xs text-muted-foreground">Principal Software Engineer</p>
+          <p className="font-semibold text-white text-base">Giorgi Kobaidze</p>
+          <p className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>Principal Software Engineer</p>
         </div>
       </div>
-      <p className="text-sm text-muted-foreground/70 leading-relaxed">
-        Built for the DEV × Notion MCP Challenge. I obsess over clean tools and sharp interfaces — NoteRunway is what I'd actually want in my own workflow.
+
+      <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>
+        Built for the <span style={{ color: '#00d4ff' }}>DEV × Notion MCP Challenge</span>. I obsess over clean tools and sharp interfaces — NoteRunway is what I'd actually want in my own workflow.
       </p>
-      <div className="flex items-center gap-4 pt-1">
-        <SocialLink href="https://github.com/georgekobaidze" icon={<Github size={14} />} label="GitHub" />
-        <SocialLink href="https://www.linkedin.com/in/giorgikobaidze/" icon={<Linkedin size={14} />} label="LinkedIn" />
-        <SocialLink href="https://x.com/georgekobaidze" icon={<Twitter size={14} />} label="X" />
-        <SocialLink href="https://dev.to/georgekobaidze" icon={<BookOpen size={14} />} label="DEV" />
+
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '1.25rem' }}>
+        <p className="text-xs font-mono mb-4" style={{ color: 'rgba(255,255,255,0.3)', letterSpacing: '0.1em' }}>FIND ME ONLINE</p>
+        <div className="flex flex-wrap gap-3">
+          <SocialBtn href="https://github.com/georgekobaidze"         icon={<Github   size={15} />} label="GitHub"   />
+          <SocialBtn href="https://www.linkedin.com/in/giorgikobaidze/" icon={<Linkedin size={15} />} label="LinkedIn" />
+          <SocialBtn href="https://x.com/georgekobaidze"              icon={<Twitter  size={15} />} label="X / Twitter" />
+          <SocialBtn href="https://dev.to/georgekobaidze"             icon={<BookOpen size={15} />} label="DEV.to"  />
+        </div>
       </div>
     </div>
   )
 }
 
-function ContributePanel() {
+function ContributeContent() {
   return (
-    <div className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground/70 leading-relaxed">
-        NoteRunway is open source. PRs, issues, and ideas are all welcome.
+    <div className="flex flex-col gap-5">
+      <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>
+        NoteRunway is open source. All contributions — PRs, issues, ideas, feedback — are welcome.
       </p>
-      <div className="flex flex-col gap-2">
-        <ContributeLink
+
+      <div className="grid grid-cols-2 gap-3">
+        <ContributeCard
           href="https://github.com/georgekobaidze/noterunway"
-          icon={<Github size={14} />}
-          label="Star & fork on GitHub"
-          sub="Browse the source code"
+          icon={<Github size={20} />}
+          title="GitHub"
+          sub="Star, fork, or open a PR"
         />
-        <ContributeLink
+        <ContributeCard
           href="https://dev.to/georgekobaidze"
-          icon={<BookOpen size={14} />}
-          label="Follow on DEV"
-          sub="Read the submission post"
+          icon={<BookOpen size={20} />}
+          title="DEV.to"
+          sub="Read the submission article"
         />
-        <ContributeLink
+        <ContributeCard
           href="https://x.com/georgekobaidze"
-          icon={<Twitter size={14} />}
-          label="Reach out on X"
-          sub="Feature requests, feedback"
+          icon={<Twitter size={20} />}
+          title="X / Twitter"
+          sub="Share ideas & feedback"
+        />
+        <ContributeCard
+          href="https://www.linkedin.com/in/giorgikobaidze/"
+          icon={<Linkedin size={20} />}
+          title="LinkedIn"
+          sub="Connect professionally"
         />
       </div>
     </div>
   )
 }
 
-function WhatsNextPanel() {
+function WhatsNextContent() {
   const items = [
-    'Markdown rendering in Semantic Ask chat',
-    'Execute results fed back to AI conversation context',
+    'Markdown rendering in Semantic Ask chat responses',
+    'AI conversation context updated with execute results',
     'New Chat button to reset conversation',
-    'Notion OAuth (connect without integration token)',
-    'Mobile-friendly layout',
-    'Scheduled workspace health reports',
+    'Notion OAuth — connect without an integration token',
+    'Mobile-friendly responsive layout',
+    'Scheduled workspace health digest emails',
     'Export scan results to CSV / PDF',
+    'Plugin system for custom workspace rules',
   ]
+
   return (
-    <div className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground/70 leading-relaxed">Planned for after the challenge deadline:</p>
-      <div className="flex flex-col gap-2.5">
+    <div className="flex flex-col gap-5">
+      <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>
+        Planned improvements after the challenge deadline:
+      </p>
+      <ul className="flex flex-col gap-3">
         {items.map(item => (
-          <div key={item} className="flex items-start gap-3 text-sm text-muted-foreground/60">
-            <span className="text-[#00d4ff]/40 shrink-0 mt-px font-mono">◦</span>
-            <span>{item}</span>
-          </div>
+          <li key={item} className="flex items-start gap-3 text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>
+            <span className="shrink-0 mt-0.5" style={{ color: '#00d4ff' }}>◦</span>
+            {item}
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   )
 }
 
-function SocialLink({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
+/* ── Shared sub-components ───────────────────────────────────── */
+
+function SocialBtn({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer"
-      className="flex items-center gap-1.5 text-xs text-muted-foreground/50 hover:text-[#00d4ff] transition-colors">
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer"
+      style={{ background: 'rgba(0,212,255,0.06)', border: '1px solid rgba(0,212,255,0.2)', color: 'rgba(255,255,255,0.55)' }}
+      onMouseEnter={e => {
+        const el = e.currentTarget
+        el.style.background = 'rgba(0,212,255,0.15)'
+        el.style.borderColor = '#00d4ff'
+        el.style.color = '#00d4ff'
+      }}
+      onMouseLeave={e => {
+        const el = e.currentTarget
+        el.style.background = 'rgba(0,212,255,0.06)'
+        el.style.borderColor = 'rgba(0,212,255,0.2)'
+        el.style.color = 'rgba(255,255,255,0.55)'
+      }}
+    >
       {icon} {label}
     </a>
   )
 }
 
-function ContributeLink({ href, icon, label, sub }: { href: string; icon: React.ReactNode; label: string; sub: string }) {
+function ContributeCard({ href, icon, title, sub }: { href: string; icon: React.ReactNode; title: string; sub: string }) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer"
-      className="flex items-center gap-3 px-4 py-3 rounded-lg border border-white/5 hover:border-[#00d4ff]/40 transition-all group"
-      style={{ background: 'rgba(255,255,255,0.02)' }}>
-      <span className="text-muted-foreground/50 group-hover:text-[#00d4ff] transition-colors shrink-0">{icon}</span>
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex flex-col gap-2 p-4 rounded-lg transition-all duration-150 cursor-pointer group"
+      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+      onMouseEnter={e => {
+        const el = e.currentTarget
+        el.style.background = 'rgba(0,212,255,0.08)'
+        el.style.borderColor = 'rgba(0,212,255,0.5)'
+        el.style.transform = 'translateY(-2px)'
+        el.style.boxShadow = '0 6px 20px rgba(0,212,255,0.15)'
+      }}
+      onMouseLeave={e => {
+        const el = e.currentTarget
+        el.style.background = 'rgba(255,255,255,0.03)'
+        el.style.borderColor = 'rgba(255,255,255,0.07)'
+        el.style.transform = ''
+        el.style.boxShadow = ''
+      }}
+    >
+      <span style={{ color: '#00d4ff' }}>{icon}</span>
       <div>
-        <p className="text-sm font-medium text-foreground/80 group-hover:text-[#00d4ff] transition-colors">{label}</p>
-        <p className="text-xs text-muted-foreground/40 mt-0.5">{sub}</p>
+        <p className="font-semibold text-sm" style={{ color: 'rgba(255,255,255,0.85)' }}>{title}</p>
+        <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{sub}</p>
       </div>
     </a>
   )

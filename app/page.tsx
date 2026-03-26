@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { NetworkBackground } from '@/components/Landing/NetworkBackground'
 import { TerminalDemo } from '@/components/Landing/TerminalDemo'
 import { FeatureCard } from '@/components/Landing/FeatureCard'
+import { InfoLinks } from '@/components/Landing/InfoLinks'
 import { Navbar } from '@/components/Navbar'
 import { LayoutDashboard, GitMerge, Trash2, Network, Sparkles, Link2Off, ShieldAlert } from 'lucide-react'
 import Link from 'next/link'
@@ -71,6 +72,7 @@ export default function Home() {
 
       <Navbar rightSlot={
         <div className="flex items-center gap-4">
+          <InfoLinks />
           {connected
             ? <Link href="/dashboard" className="neon-btn px-8 py-3 text-sm">Go to Dashboard →</Link>
             : <Link href="/settings" className="neon-btn px-8 py-3 text-sm">Connect Notion →</Link>
