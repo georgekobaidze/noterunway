@@ -51,6 +51,7 @@ const FEATURES = [
     title: 'Semantic Ask',
     description: 'Free-form natural language instructions. AI decomposes them into actions and awaits your approval.',
     tag: 'AI · MCP',
+    featured: true,
   },
 ]
 
@@ -121,14 +122,14 @@ export default function Home() {
         <h2 className="text-center text-2xl font-bold mb-2">Everything your workspace needs</h2>
         <p className="text-center text-muted-foreground mb-10 text-sm">Seven tools. One interface. Zero lock-in.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {FEATURES.filter(f => f.title !== 'Semantic Ask').map((f) => (
+          {FEATURES.filter(f => !f.featured).map((f) => (
             <FeatureCard key={f.title} {...f} />
           ))}
         </div>
-        {/* Semantic Ask — full-width featured card */}
-        {FEATURES.filter(f => f.title === 'Semantic Ask').map((f) => (
+        {/* Featured card — full-width */}
+        {FEATURES.filter(f => f.featured).map((f) => (
           <div key={f.title} className="mt-5">
-            <FeatureCard {...f} featured />
+            <FeatureCard {...f} />
           </div>
         ))}
       </section>
