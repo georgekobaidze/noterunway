@@ -18,20 +18,26 @@ export function InfoLinks() {
 
   const openPanel = (id: Panel) => {
     setOpen(id)
-    // next tick so the element is mounted before the transition fires
+    document.body.style.overflow = 'hidden'
     requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)))
   }
 
   const closePanel = () => {
     setVisible(false)
-    setTimeout(() => setOpen(null), 300)
+    setTimeout(() => {
+      setOpen(null)
+      document.body.style.overflow = ''
+    }, 300)
   }
 
   // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') closePanel() }
     window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
+    return () => {
+      window.removeEventListener('keydown', handler)
+      document.body.style.overflow = ''
+    }
   }, [])
 
   return (
