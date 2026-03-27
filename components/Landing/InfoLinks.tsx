@@ -247,7 +247,7 @@ function ContributeContent({ onSocialLinks }: { onSocialLinks: () => void }) {
   return (
     <div className="flex flex-col gap-5">
       <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.6)' }}>
-        NoteRunway is open source. All contributions — PRs, issues, ideas, feedback — are welcome.
+        NoteRunway is open source. All contributions (PRs, issues, ideas, feedback) are welcome.
       </p>
 
       <div className="grid grid-cols-2 gap-3">
@@ -294,14 +294,11 @@ function ContributeContent({ onSocialLinks }: { onSocialLinks: () => void }) {
 
 function WhatsNextContent({ onSocialLinks, onContribute }: { onSocialLinks: () => void; onContribute: () => void }) {
   const items = [
-    'Markdown rendering in Semantic Ask chat responses',
-    'AI conversation context updated with execute results',
-    'New Chat button to reset conversation',
-    'Notion OAuth — connect without an integration token',
-    'Mobile-friendly responsive layout',
-    'Scheduled workspace health digest emails',
-    'Export scan results to CSV / PDF',
-    'Plugin system for custom workspace rules',
+    'New Chat: reset the Semantic Ask conversation and start fresh without a page reload',
+    'Export scan results to CSV or PDF for sharing, auditing, or archiving',
+    'Mobile app: full NoteRunway experience on iOS and Android',
+    'Desktop app: native client for macOS and Windows with offline support',
+    'Voice chat: talk to your workspace instead of typing',
   ]
 
   return (
