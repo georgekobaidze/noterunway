@@ -1,10 +1,9 @@
 'use client'
 
-import { Suspense, useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Navbar } from '@/components/Navbar'
-import { Check, Loader2 } from 'lucide-react'
 import { InfoLinks } from '@/components/Landing/InfoLinks'
 import { useSettings } from '@/lib/hooks/useSettings'
 import { MODEL_META, type ModelId } from '@/lib/models'
@@ -36,17 +35,6 @@ function SettingsPageInner() {
   const { settings, aiKey, save, loaded } = useSettings()
   const [notionWorkspace, setNotionWorkspace] = useState<{ name: string; id: string } | null>(null)
   const [connected, setConnected] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const savingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => {
-    return () => {
-      if (savingTimeoutRef.current) clearTimeout(savingTimeoutRef.current)
-      if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current)
-    }
-  }, [])
 
   useEffect(() => {
     fetch('/api/notion/status')
@@ -59,18 +47,6 @@ function SettingsPageInner() {
       })
       .catch(() => {})
   }, [searchParams])
-
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (savingTimeoutRef.current) clearTimeout(savingTimeoutRef.current)
-    if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current)
-    setSaving(true)
-    savingTimeoutRef.current = setTimeout(() => {
-      setSaving(false)
-      setSaved(true)
-      savedTimeoutRef.current = setTimeout(() => setSaved(false), 2000)
-    }, 800)
-  }
 
   const oauthError = searchParams.get('error')
 
@@ -166,87 +142,73 @@ function SettingsPageInner() {
             </section>
 
             {/* AI settings */}
-            <form onSubmit={handleSave}>
-              <section className="glass-card neon-border rounded-xl p-6 flex flex-col gap-5">
-                <h2 className="text-sm font-semibold tracking-widest uppercase text-[#00d4ff]" style={{ fontFamily: 'var(--font-orbitron), sans-serif' }}>
-                  AI Provider
-                </h2>
+            <section className="glass-card neon-border rounded-xl p-6 flex flex-col gap-5">
+              <h2 className="text-sm font-semibold tracking-widest uppercase text-[#00d4ff]" style={{ fontFamily: 'var(--font-orbitron), sans-serif' }}>
+                AI Provider
+              </h2>
 
-                <p className="text-muted-foreground text-xs -mt-2">
-                  Your key is stored in browser localStorage only — never sent to NoteRunway&apos;s servers.
-                </p>
+              <p className="text-muted-foreground text-xs -mt-2">
+                Your key is stored in browser localStorage only — never sent to NoteRunway&apos;s servers.
+              </p>
 
-                {/* Provider selector */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs text-muted-foreground uppercase tracking-widest">Provider</label>
-                  <div className="flex gap-2">
-                    {(['openai', 'anthropic', 'xai', 'google'] as const).map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => save({ aiProvider: p, modelId: PROVIDER_MODELS[p][0].id })}
-                        className={`px-4 py-2 text-xs border transition-all ${
-                          settings.aiProvider === p
-                            ? 'border-[#00d4ff] text-[#00d4ff] bg-[#00d4ff]/10'
-                            : 'border-border text-muted-foreground hover:border-[#00d4ff]/40'
-                        }`}
-                        style={{ fontFamily: 'var(--font-orbitron), sans-serif', letterSpacing: '0.08em' }}
-                      >
-                        {p === 'xai' ? 'xAI Grok' : p === 'google' ? 'Google' : p.charAt(0).toUpperCase() + p.slice(1)}
-                      </button>
-                    ))}
-                  </div>
+              {/* Provider selector */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs text-muted-foreground uppercase tracking-widest">Provider</label>
+                <div className="flex gap-2">
+                  {(['openai', 'anthropic', 'xai', 'google'] as const).map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => save({ aiProvider: p, modelId: PROVIDER_MODELS[p][0].id })}
+                      className={`px-4 py-2 text-xs border transition-all ${
+                        settings.aiProvider === p
+                          ? 'border-[#00d4ff] text-[#00d4ff] bg-[#00d4ff]/10'
+                          : 'border-border text-muted-foreground hover:border-[#00d4ff]/40'
+                      }`}
+                      style={{ fontFamily: 'var(--font-orbitron), sans-serif', letterSpacing: '0.08em' }}
+                    >
+                      {p === 'xai' ? 'xAI Grok' : p === 'google' ? 'Google' : p.charAt(0).toUpperCase() + p.slice(1)}
+                    </button>
+                  ))}
                 </div>
+              </div>
 
-                {/* Model selector */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs text-muted-foreground uppercase tracking-widest">Model</label>
-                  <div className="flex flex-wrap gap-2">
-                    {PROVIDER_MODELS[settings.aiProvider].map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => save({ modelId: m.id as ModelId })}
-                        className={`px-3 py-1.5 text-xs border transition-all ${
-                          settings.modelId === m.id
-                            ? 'border-[#00ff88] text-[#00ff88] bg-[#00ff88]/10'
-                            : 'border-border text-muted-foreground hover:border-[#00ff88]/40'
-                        }`}
-                      >
-                        {m.label}
-                        {m.tier === 'fast' && <span className="ml-1 opacity-50 text-[10px]">fast</span>}
-                      </button>
-                    ))}
-                  </div>
+              {/* Model selector */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs text-muted-foreground uppercase tracking-widest">Model</label>
+                <div className="flex flex-wrap gap-2">
+                  {PROVIDER_MODELS[settings.aiProvider].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => save({ modelId: m.id as ModelId })}
+                      className={`px-3 py-1.5 text-xs border transition-all ${
+                        settings.modelId === m.id
+                          ? 'border-[#00ff88] text-[#00ff88] bg-[#00ff88]/10'
+                          : 'border-border text-muted-foreground hover:border-[#00ff88]/40'
+                      }`}
+                    >
+                      {m.label}
+                      {m.tier === 'fast' && <span className="ml-1 opacity-50 text-[10px]">fast</span>}
+                    </button>
+                  ))}
                 </div>
+              </div>
 
-                {/* API Key */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs text-muted-foreground uppercase tracking-widest">
-                    {settings.aiProvider === 'xai' ? 'xAI' : settings.aiProvider.charAt(0).toUpperCase() + settings.aiProvider.slice(1)} API Key
-                  </label>
-                  <input
-                    type="password"
-                    value={aiKey}
-                    onChange={(e) => save({ aiKey: e.target.value })}
-                    placeholder={PROVIDER_KEY_PLACEHOLDER[settings.aiProvider]}
-                    className="bg-transparent border border-border rounded px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/40 focus:border-[#00d4ff] focus:outline-none transition-colors"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={saving || saved}
-                  className="neon-btn px-6 py-2.5 self-start flex items-center gap-2 disabled:opacity-70"
-                >
-                  {saving ? (
-                    <><Loader2 size={14} className="animate-spin" /> Saving...</>
-                  ) : saved ? (
-                    <><Check size={14} /> Saved</>
-                  ) : 'Save Settings'}
-                </button>
-              </section>
-            </form>
+              {/* API Key */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs text-muted-foreground uppercase tracking-widest">
+                  {settings.aiProvider === 'xai' ? 'xAI' : settings.aiProvider.charAt(0).toUpperCase() + settings.aiProvider.slice(1)} API Key
+                </label>
+                <input
+                  type="password"
+                  value={aiKey}
+                  onChange={(e) => save({ aiKey: e.target.value })}
+                  placeholder={PROVIDER_KEY_PLACEHOLDER[settings.aiProvider]}
+                  className="bg-transparent border border-border rounded px-3 py-2 text-sm font-mono text-foreground placeholder:text-muted-foreground/40 focus:border-[#00d4ff] focus:outline-none transition-colors"
+                />
+              </div>
+            </section>
           </>
         )}
       </main>
