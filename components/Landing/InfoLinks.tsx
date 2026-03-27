@@ -121,7 +121,7 @@ export function InfoLinks() {
 
             {/* Body */}
             <div className="overflow-y-auto flex-1 px-6 py-6">
-              {open === 'built-by'   && <BuiltByContent />}
+              {open === 'built-by'   && <BuiltByContent onWhatsNext={() => { closePanel(); setTimeout(() => openPanel('whats-next'), 350) }} />}
               {open === 'contribute' && <ContributeContent />}
               {open === 'whats-next' && <WhatsNextContent />}
             </div>
@@ -135,7 +135,7 @@ export function InfoLinks() {
 
 /* ── Panel contents ─────────────────────────────────────────── */
 
-function BuiltByContent() {
+function BuiltByContent({ onWhatsNext }: { onWhatsNext: () => void }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '0.5rem 0' }}>
 
@@ -143,12 +143,11 @@ function BuiltByContent() {
       <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', paddingBottom: '1.25rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <div style={{
           width: 80, height: 80, borderRadius: '50%', flexShrink: 0,
-          background: 'rgba(0,212,255,0.1)', border: '3px solid #00d4ff',
+          border: '3px solid #00d4ff',
           boxShadow: '0 0 20px rgba(0,212,255,0.5)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '1.25rem', fontWeight: 700, color: '#00d4ff',
+          overflow: 'hidden',
         }}>
-          GK
+          <img src="/images/author-real.jpeg" alt="Giorgi Kobaidze" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <h2 style={{ margin: 0, fontFamily: 'var(--font-orbitron, monospace)', fontSize: '1.25rem', color: '#00d4ff', textShadow: '0 0 10px rgba(0,212,255,0.5)', letterSpacing: 1 }}>
@@ -180,16 +179,22 @@ function BuiltByContent() {
       {/* Project Purpose */}
       <Section title="Project Purpose">
         <BlockText>
-          What started as a DEV × Notion MCP Challenge submission quickly turned into one of the most interesting projects I've built. NoteRunway brings AI-powered workspace intelligence to Notion — without ever acting on your data without your explicit approval.
+          I've been a Notion user for years. It's where I think, plan, and build. So when I saw the DEV × Notion MCP Challenge, I didn't hesitate for a second, this was exactly the kind of problem I'd been wanting to solve for myself.
         </BlockText>
         <BlockText>
-          The idea is simple: your Notion workspace accumulates cruft over time — duplicates, dead links, orphaned pages, leaked secrets. NoteRunway finds all of it, explains what it found, and only moves when you say go. Every destructive action is human-approved.
+          Every Notion workspace gets messy over time. Duplicates pile up, links go dead, sensitive tokens slip into pages you forgot about. I wanted a tool that would actually do something about it, not just surface the problems, but let AI work through them while I stay in control. That's NoteRunway.
         </BlockText>
         <BlockText>
-          I built NoteRunway because it's the tool I'd actually want in my own workflow. If you feel the same way, I hope you enjoy it — and I'd love to hear what you think.
+          Notion has genuinely changed the way I organize my life and work, it's one of those rare tools that just clicks right away. Building NoteRunway felt like my chance to give something back to a platform that's given me so much.
         </BlockText>
         <p style={{ margin: '0.5rem 0 0 0', fontSize: '1rem', color: 'rgba(255,255,255,0.6)', fontStyle: 'italic' }}>
-          And that's not all — there are many more features planned for the future.
+          And that's not all!{' '}
+          <button
+            onClick={() => onWhatsNext()}
+            style={{ color: '#00d4ff', textDecoration: 'underline', textUnderlineOffset: 3, background: 'none', border: 'none', cursor: 'pointer', fontSize: 'inherit', fontStyle: 'inherit', padding: 0 }}
+          >
+            There are more features planned for the future.
+          </button>
         </p>
       </Section>
 
