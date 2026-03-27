@@ -162,15 +162,17 @@
     text-transform: uppercase;
     color: #00d4ff;
     background: transparent;
-    border: 1px solid rgba(0, 212, 255, 0.5);
-    box-shadow: 0 0 8px rgba(0, 212, 255, 0.2);
+    border: 1px solid rgba(0, 212, 255, 0.6);
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.25), inset 0 0 8px rgba(0, 212, 255, 0.05);
+    text-shadow: 0 0 8px rgba(0, 212, 255, 0.6);
     clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
     transition: all 0.2s ease;
   }
   .neon-btn-ghost:hover {
-    color: #00d4ff;
-    border-color: rgba(0, 212, 255, 0.6);
-    box-shadow: 0 0 12px rgba(0, 212, 255, 0.3);
+    color: #fff;
+    border-color: #00d4ff;
+    box-shadow: 0 0 18px rgba(0, 212, 255, 0.5), inset 0 0 10px rgba(0, 212, 255, 0.1);
+    text-shadow: 0 0 10px rgba(0, 212, 255, 0.9);
   }
   .neon-btn-danger {
     position: relative;
