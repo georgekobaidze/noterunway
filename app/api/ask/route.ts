@@ -89,10 +89,9 @@ export async function POST(req: NextRequest) {
 
   const encoder = new TextEncoder()
   const mcpClient = new MCPClient(token)
-  let stepCounter = 0
   let mcpConnected = false
+  let stepCounter = 0
 
-  // Lazily connect MCP only when a tool actually fires
   const ensureMcp = async () => {
     if (!mcpConnected) {
       await mcpClient.connect()
@@ -100,9 +99,31 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // MCP tool wrapper — connects lazily, always sends tool_end
+  const runMcpTool = async (
+    stepId: string,
+    toolName: string,
+    mcpTool: string,
+    parameters: Record<string, unknown>,
+    approved = false,
+  ) => {
+    try {
+      await ensureMcp()
+      const r = await mcpClient.executeTool({ tool: mcpTool, parameters, approved })
+      send('tool_end', { stepId, tool: toolName, success: r.success })
+      return r.success ? r.data : { error: r.error }
+    } catch (err) {
+      send('tool_end', { stepId, tool: toolName, success: false })
+      return { error: err instanceof Error ? err.message : 'Tool failed' }
+    }
+  }
+
+  // send is defined inside the stream callback; forward-declare for runMcpTool
+  let send: (event: string, data: unknown) => void = () => {}
+
   const stream = new ReadableStream({
     async start(controller) {
-      const send = (event: string, data: unknown) =>
+      send = (event: string, data: unknown) =>
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
 
       try {
@@ -120,33 +141,23 @@ export async function POST(req: NextRequest) {
               execute: async (input) => {
                 const stepId = `step-${++stepCounter}`
                 send('tool_start', { stepId, tool: 'search_pages', args: { query: input.query } })
-                await ensureMcp()
-                const r = await mcpClient.executeTool({
-                  tool: 'API-post-search',
-                  parameters: { query: input.query, filter: { value: 'page', property: 'object' } },
-                  approved: false,
+                return runMcpTool(stepId, 'search_pages', 'API-post-search', {
+                  query: input.query,
+                  filter: { value: 'page', property: 'object' },
+                  page_size: 20,
                 })
-                send('tool_end', { stepId, tool: 'search_pages', success: r.success })
-                return r.success ? r.data : { error: r.error }
               },
             }),
 
             get_page: tool({
-              description: 'Get the full content of a specific Notion page by its ID',
+              description: 'Get the metadata of a specific Notion page by its ID',
               inputSchema: z.object({
                 page_id: z.string().describe('The Notion page ID'),
               }),
               execute: async (input) => {
                 const stepId = `step-${++stepCounter}`
                 send('tool_start', { stepId, tool: 'get_page', args: { page_id: input.page_id } })
-                await ensureMcp()
-                const r = await mcpClient.executeTool({
-                  tool: 'API-retrieve-a-page',
-                  parameters: { page_id: input.page_id },
-                  approved: false,
-                })
-                send('tool_end', { stepId, tool: 'get_page', success: r.success })
-                return r.success ? r.data : { error: r.error }
+                return runMcpTool(stepId, 'get_page', 'API-retrieve-a-page', { page_id: input.page_id })
               },
             }),
 
@@ -158,14 +169,7 @@ export async function POST(req: NextRequest) {
               execute: async (input) => {
                 const stepId = `step-${++stepCounter}`
                 send('tool_start', { stepId, tool: 'get_page_content', args: { page_id: input.page_id } })
-                await ensureMcp()
-                const r = await mcpClient.executeTool({
-                  tool: 'API-get-block-children',
-                  parameters: { block_id: input.page_id },
-                  approved: false,
-                })
-                send('tool_end', { stepId, tool: 'get_page_content', success: r.success })
-                return r.success ? r.data : { error: r.error }
+                return runMcpTool(stepId, 'get_page_content', 'API-get-block-children', { block_id: input.page_id })
               },
             }),
 
@@ -190,9 +194,8 @@ export async function POST(req: NextRequest) {
                   send('tool_end', { stepId, tool: 'run_analysis', success: true })
                   return data
                 } catch (err) {
-                  const message = err instanceof Error ? err.message : 'Unknown error'
                   send('tool_end', { stepId, tool: 'run_analysis', success: false })
-                  return { error: message }
+                  return { error: err instanceof Error ? err.message : 'Analysis failed' }
                 }
               },
             }),

@@ -213,7 +213,12 @@ export default function AskPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ actions }),
       })
-      const data = await res.json()
+      const text = await res.text()
+      const data = text ? JSON.parse(text) : {}
+
+      if (!res.ok) {
+        throw new Error(data.message ?? `Server error ${res.status}`)
+      }
 
       const lines = [
         ...(data.results ?? []).map((r: string) => `✓ ${r}`),

@@ -48,18 +48,14 @@ export async function POST(req: NextRequest) {
   const results: string[] = []
   const failedActions: string[] = []
 
-  // Archive actions use NotionClient.moveToArchive() — creates an audit stub in
-  // "NoteRunway Archive / Ask" AND sends the original to Notion Trash, matching
-  // the behaviour of every other NoteRunway feature.
   const notion = new NotionClient(token)
-
-  // Create/update actions use MCPClient so writes go through the MCP layer.
   const mcpClient = new MCPClient(token)
 
   try {
-    // Only connect MCP if there are non-archive actions
     const needsMcp = actions.some((a) => a.type !== 'archive')
-    if (needsMcp) await mcpClient.connect()
+    if (needsMcp) {
+      await mcpClient.connect()
+    }
 
     for (const action of actions) {
       if (action.type === 'archive') {
