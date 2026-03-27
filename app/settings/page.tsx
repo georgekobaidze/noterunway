@@ -95,14 +95,34 @@ function SettingsPageInner() {
 
               {connected && notionWorkspace ? (
                 <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-emerald-400">✦ Connected</p>
-                      <p className="text-foreground font-medium">{notionWorkspace.name}</p>
+                  <div
+                    className="flex items-center justify-between rounded-xl px-4 py-3"
+                    style={{ border: '1px solid rgba(0,212,255,0.2)', background: 'rgba(0,212,255,0.04)' }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span style={{
+                        display: 'inline-block',
+                        width: 8, height: 8,
+                        borderRadius: '50%',
+                        background: '#00ff88',
+                        boxShadow: '0 0 6px #00ff88, 0 0 12px rgba(0,255,136,0.5)',
+                        flexShrink: 0,
+                      }} />
+                      <div>
+                        <p className="text-xs font-mono uppercase tracking-widest" style={{ color: '#00ff88' }}>Connected</p>
+                        <p className="font-mono font-semibold text-sm" style={{ color: '#00d4ff' }}>{notionWorkspace.name}</p>
+                      </div>
                     </div>
-                    <a href="/api/notion/auth" className="neon-btn-ghost px-4 py-2 text-xs">
-                      Reconnect
-                    </a>
+                    <div className="flex items-center gap-2">
+                      <a href="/api/notion/auth" className="neon-btn-ghost px-4 py-2 text-xs">
+                        Reconnect
+                      </a>
+                      <form method="POST" action="/api/notion/disconnect">
+                        <button type="submit" className="neon-btn-danger px-4 py-2 text-xs">
+                          Disconnect
+                        </button>
+                      </form>
+                    </div>
                   </div>
                   <p className="text-[11px] text-muted-foreground/60 font-mono">
                     New pages not showing up? Reconnect and select your workspace name at the top of Notion&apos;s page list to grant access to all pages.

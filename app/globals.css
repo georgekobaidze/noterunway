@@ -172,6 +172,24 @@
     border-color: rgba(0, 212, 255, 0.6);
     box-shadow: 0 0 12px rgba(0, 212, 255, 0.3);
   }
+  .neon-btn-danger {
+    position: relative;
+    font-family: var(--font-orbitron, 'Orbitron'), sans-serif;
+    font-size: 0.8rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #ff5050;
+    background: transparent;
+    border: 1px solid rgba(255, 80, 80, 0.5);
+    box-shadow: 0 0 8px rgba(255, 80, 80, 0.2);
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+    transition: all 0.2s ease;
+  }
+  .neon-btn-danger:hover {
+    color: #ff5050;
+    border-color: rgba(255, 80, 80, 0.8);
+    box-shadow: 0 0 12px rgba(255, 80, 80, 0.4);
+  }
   .glass-card {
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
