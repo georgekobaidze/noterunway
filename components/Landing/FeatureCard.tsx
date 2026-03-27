@@ -18,7 +18,7 @@ export function FeatureCard({ icon, title, description, tag, featured }: Feature
           {icon}
         </div>
       </div>
-      <div className={`flex flex-col gap-2 flex-1 ${featured ? '' : ''}`}>
+      <div className="flex flex-col gap-2 flex-1">
         <div className="flex items-center gap-3">
           <h3 className="font-semibold text-foreground text-base">{title}</h3>
           {tag && (
