@@ -267,7 +267,7 @@ export default function AskPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <Navbar rightSlot={<Link href="/settings" className="neon-btn-ghost px-8 py-3 text-sm">Settings</Link>} />
+      <Navbar rightSlot={<Link href="/dashboard" className="neon-btn-ghost text-sm w-32 text-center py-3">Dashboard</Link>} />
 
       <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-4 py-4 gap-3">
         <Link href="/dashboard" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-[#00d4ff] transition-colors w-fit">

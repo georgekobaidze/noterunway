@@ -229,7 +229,7 @@ export default function DuplicatesPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar rightSlot={
-        <Link href="/settings" className="neon-btn-ghost px-8 py-3 text-sm">Settings</Link>
+        <Link href="/dashboard" className="neon-btn-ghost text-sm w-32 text-center py-3">Dashboard</Link>
       } />
 
       <main className="flex-1 max-w-4xl mx-auto w-full px-6 py-10 flex flex-col gap-8">

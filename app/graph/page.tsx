@@ -447,7 +447,7 @@ export default function GraphPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar
         rightSlot={
-          <Link href="/settings" className="neon-btn-ghost px-8 py-3 text-sm">Settings</Link>
+          <Link href="/dashboard" className="neon-btn-ghost text-sm w-32 text-center py-3">Dashboard</Link>
         }
       />
 

@@ -156,7 +156,7 @@ export default function DashboardPage() {
       <Navbar rightSlot={
         <div className="flex items-center gap-3">
           <InfoLinks />
-          <Link href="/settings" className="neon-btn-ghost px-8 py-3 text-sm">Settings</Link>
+          <Link href="/settings" className="neon-btn-ghost text-sm w-32 text-center py-3">Settings</Link>
         </div>
       } />
 

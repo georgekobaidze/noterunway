@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Navbar } from '@/components/Navbar'
+import { InfoLinks } from '@/components/Landing/InfoLinks'
 import { useSettings } from '@/lib/hooks/useSettings'
 import { MODEL_META, type ModelId } from '@/lib/models'
 
@@ -59,9 +60,10 @@ function SettingsPageInner() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar rightSlot={
-        connected
-          ? <Link href="/dashboard" className="neon-btn px-8 py-3 text-sm">Go to Dashboard →</Link>
-          : undefined
+        <div className="flex items-center gap-3">
+          <InfoLinks />
+          {connected && <Link href="/dashboard" className="neon-btn-ghost text-sm w-32 text-center py-3">Dashboard</Link>}
+        </div>
       } />
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-6 py-12 flex flex-col gap-10">
