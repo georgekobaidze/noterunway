@@ -8,8 +8,8 @@ import { getModelWithKey, MODEL_META, DEFAULT_MODEL, type ModelId } from '@/lib/
 // ─── Request schema ──────────────────────────────────────────────────────────
 
 const MessageSchema = z.object({
-  role: z.enum(['user', 'assistant', 'system', 'tool']),
-  content: z.union([z.string(), z.array(z.record(z.string(), z.unknown()))]),
+  role: z.enum(['user', 'assistant']),
+  content: z.string(),
 })
 
 const RequestBodySchema = z.object({
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const { messages } = parsed.data
+  const messages = parsed.data.messages as { role: 'user' | 'assistant'; content: string }[]
   const model = getModelWithKey(modelId, aiKey)
 
   const encoder = new TextEncoder()

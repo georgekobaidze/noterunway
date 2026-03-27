@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react'
 import { NetworkBackground } from '@/components/Landing/NetworkBackground'
 import { TerminalDemo } from '@/components/Landing/TerminalDemo'
 import { FeatureCard } from '@/components/Landing/FeatureCard'
+import { InfoLinks } from '@/components/Landing/InfoLinks'
 import { Navbar } from '@/components/Navbar'
-import { LayoutDashboard, GitMerge, Trash2, Network, Database, Sparkles } from 'lucide-react'
+import { LayoutDashboard, GitMerge, Trash2, Network, Sparkles, Link2Off, ShieldAlert } from 'lucide-react'
 import Link from 'next/link'
 
 const FEATURES = [
@@ -34,20 +35,27 @@ const FEATURES = [
     tag: 'visual',
   },
   {
-    icon: <Database size={24} />,
-    title: 'SQL Query',
-    description: 'Query your Notion workspace with SQL-like syntax. SELECT, WHERE, ORDER BY — results as a sortable table.',
-    tag: 'query',
+    icon: <Link2Off size={24} />,
+    title: 'Dead Link Detector',
+    description: 'Scans every page for @mentions pointing to archived or deleted pages so nothing quietly breaks.',
+    tag: 'scan',
+  },
+  {
+    icon: <ShieldAlert size={24} />,
+    title: 'Sensitive Data Finder',
+    description: 'Detects accidentally stored API keys, tokens, passwords, and PII before they become a security incident.',
+    tag: 'scan',
   },
   {
     icon: <Sparkles size={24} />,
     title: 'Semantic Ask',
     description: 'Free-form natural language instructions. AI decomposes them into actions and awaits your approval.',
     tag: 'AI · MCP',
+    featured: true,
   },
 ]
 
-const PROVIDERS = ['OpenAI', 'Anthropic', 'xAI Grok']
+const PROVIDERS = ['OpenAI', 'Anthropic', 'xAI', 'Google Gemini']
 
 export default function Home() {
   const [connected, setConnected] = useState(false)
@@ -64,16 +72,20 @@ export default function Home() {
       <NetworkBackground />
 
       <Navbar rightSlot={
-        connected
-          ? <Link href="/dashboard" className="neon-btn px-8 py-3 text-sm">Go to Dashboard →</Link>
-          : <Link href="/settings" className="neon-btn px-8 py-3 text-sm">Connect Notion →</Link>
+        <div className="flex items-center gap-4">
+          <InfoLinks />
+          {connected
+            ? <Link href="/dashboard" className="neon-btn px-8 py-3 text-sm">Go to Dashboard →</Link>
+            : <Link href="/settings" className="neon-btn px-8 py-3 text-sm">Connect Notion →</Link>
+          }
+        </div>
       } />
 
       {/* Hero */}
       <section className="relative z-10 flex flex-col items-center text-center px-6 pt-20 pb-16 max-w-4xl mx-auto">
         <div className="inline-flex items-center gap-2 mb-6 px-3 py-1 rounded-full border border-[#00d4ff]/20 bg-[#00d4ff]/5 text-xs font-mono text-[#00d4ff]">
           <span className="w-1.5 h-1.5 rounded-full bg-[#00d4ff] animate-pulse" />
-          Powered by Notion MCP · OpenAI · Anthropic · xAI
+          Powered by Notion MCP · OpenAI · Anthropic · xAI · Google
         </div>
 
         <h1 className="text-4xl sm:text-6xl font-bold tracking-tight leading-tight mb-6">
@@ -82,9 +94,7 @@ export default function Home() {
         </h1>
 
         <p className="text-muted-foreground text-lg max-w-2xl mb-10 leading-relaxed">
-          AI-powered duplicate detection, garbage collection, dependency graphs, and
-          natural language instructions — all with human-in-the-loop approval before
-          anything changes.
+          Your workspace. Analyzed. Cleaned. Understood. <span className="neon-text">NoteRunway</span> connects AI to your Notion via MCP — and never moves a single page without your say-so.
         </p>
 
         <TerminalDemo />
@@ -110,12 +120,18 @@ export default function Home() {
       {/* Features */}
       <section className="relative z-10 px-6 py-16 max-w-6xl mx-auto">
         <h2 className="text-center text-2xl font-bold mb-2">Everything your workspace needs</h2>
-        <p className="text-center text-muted-foreground mb-10 text-sm">Six tools. One interface. Zero lock-in.</p>
+        <p className="text-center text-muted-foreground mb-10 text-sm">Seven tools. One interface. Zero lock-in.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {FEATURES.map((f) => (
+          {FEATURES.filter(f => !f.featured).map((f) => (
             <FeatureCard key={f.title} {...f} />
           ))}
         </div>
+        {/* Featured card — full-width */}
+        {FEATURES.filter(f => f.featured).map((f) => (
+          <div key={f.title} className="mt-5">
+            <FeatureCard {...f} />
+          </div>
+        ))}
       </section>
 
       {/* Provider strip */}
