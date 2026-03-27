@@ -11,6 +11,7 @@ import {
   Link2Off,
 } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
+import { InfoLinks } from '@/components/Landing/InfoLinks'
 import { CyberLoader } from '@/components/CyberLoader'
 import type { DeadLink, DeadLinkScanResult } from '@/lib/notion/NotionClient'
 
@@ -111,7 +112,10 @@ export default function DeadLinksPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar
         rightSlot={
-          <Link href="/dashboard" className="neon-btn-ghost text-sm w-32 text-center py-3">Dashboard</Link>
+          <div className="flex items-center gap-3">
+            <InfoLinks />
+            <Link href="/dashboard" className="neon-btn-ghost text-sm w-32 text-center py-3">Dashboard</Link>
+          </div>
         }
       />
 

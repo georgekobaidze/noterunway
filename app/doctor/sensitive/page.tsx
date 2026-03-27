@@ -12,6 +12,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
+import { InfoLinks } from '@/components/Landing/InfoLinks'
 import { CyberLoader } from '@/components/CyberLoader'
 import { useSettings } from '@/lib/hooks/useSettings'
 import type { SensitiveFinding, SensitiveScanResult, SensitiveCategory } from '@/lib/notion/NotionClient'
@@ -154,7 +155,10 @@ export default function SensitiveDataPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar
         rightSlot={
-          <Link href="/dashboard" className="neon-btn-ghost text-sm w-32 text-center py-3">Dashboard</Link>
+          <div className="flex items-center gap-3">
+            <InfoLinks />
+            <Link href="/dashboard" className="neon-btn-ghost text-sm w-32 text-center py-3">Dashboard</Link>
+          </div>
         }
       />
 

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, GitMerge, ScanSearch, AlertTriangle, ExternalLink, CheckCircle2, SkipForward, Star } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
+import { InfoLinks } from '@/components/Landing/InfoLinks'
 import { CyberLoader } from '@/components/CyberLoader'
 import { useSettings } from '@/lib/hooks/useSettings'
 import type { DuplicateGroup, DuplicateDetectionResult } from '@/lib/ai/DuplicateDetectionPromptBuilder'
@@ -229,7 +230,10 @@ export default function DuplicatesPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar rightSlot={
-        <Link href="/dashboard" className="neon-btn-ghost text-sm w-32 text-center py-3">Dashboard</Link>
+        <div className="flex items-center gap-3">
+          <InfoLinks />
+          <Link href="/dashboard" className="neon-btn-ghost text-sm w-32 text-center py-3">Dashboard</Link>
+        </div>
       } />
 
       <main className="flex-1 max-w-4xl mx-auto w-full px-6 py-10 flex flex-col gap-8">
