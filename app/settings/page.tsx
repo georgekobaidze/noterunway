@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Navbar } from '@/components/Navbar'
@@ -38,6 +38,15 @@ function SettingsPageInner() {
   const [connected, setConnected] = useState(false)
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
+  const savingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (savingTimerRef.current) clearTimeout(savingTimerRef.current)
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     fetch('/api/notion/status')
@@ -53,11 +62,13 @@ function SettingsPageInner() {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault()
+    if (savingTimerRef.current) clearTimeout(savingTimerRef.current)
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
     setSaving(true)
-    setTimeout(() => {
+    savingTimerRef.current = setTimeout(() => {
       setSaving(false)
       setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
+      savedTimerRef.current = setTimeout(() => setSaved(false), 2000)
     }, 800)
   }
 
