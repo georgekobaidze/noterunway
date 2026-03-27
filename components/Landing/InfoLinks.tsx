@@ -232,10 +232,10 @@ function BuiltByContent({ onWhatsNext, highlightConnect, onHighlightDone }: { on
       {/* Privacy */}
       <Section title="Privacy & Data">
         <BlockText>
-          NoteRunway never stores your Notion data. Your integration token is kept in an httpOnly cookie and used only to make API calls on your behalf. No page content, no tokens, no analytics — nothing is persisted server-side.
+          NoteRunway does not store your Notion page content or your Notion OAuth access token in any database. The <code>notion_token</code> issued by Notion's OAuth flow is kept in an httpOnly cookie and used only to make Notion API calls on your behalf during your session.
         </BlockText>
         <BlockText>
-          All AI processing happens in-memory per request. Your AI provider key is stored locally in your browser and is never sent to NoteRunway's servers.
+          All AI processing happens per request. Your AI provider key is stored locally in your browser and is sent to NoteRunway's servers with each request (for example, via a request header) so we can call your AI provider on your behalf, but it is not persisted in our databases.
         </BlockText>
       </Section>
 
