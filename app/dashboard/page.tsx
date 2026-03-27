@@ -31,30 +31,30 @@ function StatCard({ label, value, sub, accent = 'blue', loading, onScan, scanLab
   const { border, text } = colors[accent]
 
   return (
-    <div className={`glass-card rounded-xl p-6 border ${border} flex flex-col gap-2`}>
+    <div className={`glass-card rounded-xl p-6 border ${border} flex flex-col gap-2 min-h-[9rem]`}>
       <span className="text-xs font-mono uppercase tracking-widest text-muted-foreground">{label}</span>
-      {loading ? (
-        <CyberLoader />
-      ) : value !== null ? (
-        <span className={`text-4xl font-bold font-mono ${text}`}>{value}</span>
-      ) : (
-        onScan ? (
-          <button
-            onClick={onScan}
-            className="group mt-1 flex flex-col items-start gap-1 w-full text-left cursor-pointer"
-          >
-            <span className={`text-4xl font-bold font-mono ${text} flex items-end gap-0.5`}>
-              <span style={{ animation: 'cursor-blink 1.1s step-start infinite' }}>_</span>
-            </span>
-            <span
-              className={`text-[10px] font-mono uppercase tracking-[0.2em] ${text} opacity-40 group-hover:opacity-100 transition-opacity duration-200`}
-              style={{ fontFamily: 'var(--font-orbitron, Orbitron, sans-serif)' }}
+      <div className="flex flex-col gap-1 flex-1 justify-center">
+        {loading ? (
+          <CyberLoader />
+        ) : value !== null ? (
+          <span className={`text-4xl font-bold font-mono ${text}`}>{value}</span>
+        ) : (
+          onScan ? (
+            <button
+              onClick={onScan}
+              className={`group flex items-center gap-3 w-full text-left cursor-pointer ${text}`}
             >
-              {scanLabel === 'Rescan' ? '↻ rescan' : '▸ scan to reveal'}
-            </span>
-          </button>
-        ) : null
-      )}
+              <ScanSearch size={24} className="opacity-70 group-hover:opacity-100 transition-opacity duration-200 shrink-0" />
+              <span
+                className="text-[11px] font-mono uppercase tracking-[0.15em] opacity-70 group-hover:opacity-100 transition-opacity duration-200"
+                style={{ fontFamily: 'var(--font-orbitron, Orbitron, sans-serif)' }}
+              >
+                {scanLabel === 'Rescan' ? '↻ Rescan' : 'Click to start scanning'}
+              </span>
+            </button>
+          ) : null
+        )}
+      </div>
       {sub && <span className="text-xs text-muted-foreground">{sub}</span>}
     </div>
   )
@@ -200,7 +200,7 @@ export default function DashboardPage() {
           {/* Quick Stats */}
           <section className="flex flex-col gap-3">
             <h2
-              className="text-xs font-semibold uppercase tracking-widest text-muted-foreground"
+              className="text-xs font-semibold uppercase tracking-widest neon-text"
               style={{ fontFamily: 'var(--font-orbitron), sans-serif' }}
             >
               Quick Stats
@@ -249,7 +249,7 @@ export default function DashboardPage() {
           {/* Deep Scans */}
           <section className="flex flex-col gap-3">
             <h2
-              className="text-xs font-semibold uppercase tracking-widest text-muted-foreground"
+              className="text-xs font-semibold uppercase tracking-widest neon-text"
               style={{ fontFamily: 'var(--font-orbitron), sans-serif' }}
             >
               Deep Scans
@@ -279,7 +279,7 @@ export default function DashboardPage() {
           {/* Feature tools */}
           <section className="flex flex-col gap-3">
             <h2
-              className="text-xs font-semibold uppercase tracking-widest text-muted-foreground"
+              className="text-xs font-semibold uppercase tracking-widest neon-text"
               style={{ fontFamily: 'var(--font-orbitron), sans-serif' }}
             >
               Tools
