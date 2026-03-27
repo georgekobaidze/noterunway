@@ -38,13 +38,13 @@ function SettingsPageInner() {
   const [connected, setConnected] = useState(false)
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
-  const savingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const savingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     return () => {
-      if (savingTimerRef.current) clearTimeout(savingTimerRef.current)
-      if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
+      if (savingTimeoutRef.current) clearTimeout(savingTimeoutRef.current)
+      if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current)
     }
   }, [])
 
@@ -62,13 +62,13 @@ function SettingsPageInner() {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault()
-    if (savingTimerRef.current) clearTimeout(savingTimerRef.current)
-    if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
+    if (savingTimeoutRef.current) clearTimeout(savingTimeoutRef.current)
+    if (savedTimeoutRef.current) clearTimeout(savedTimeoutRef.current)
     setSaving(true)
-    savingTimerRef.current = setTimeout(() => {
+    savingTimeoutRef.current = setTimeout(() => {
       setSaving(false)
       setSaved(true)
-      savedTimerRef.current = setTimeout(() => setSaved(false), 2000)
+      savedTimeoutRef.current = setTimeout(() => setSaved(false), 2000)
     }, 800)
   }
 
