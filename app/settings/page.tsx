@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Navbar } from '@/components/Navbar'
+import { Check, Loader2 } from 'lucide-react'
 import { InfoLinks } from '@/components/Landing/InfoLinks'
 import { useSettings } from '@/lib/hooks/useSettings'
 import { MODEL_META, type ModelId } from '@/lib/models'
@@ -36,6 +37,7 @@ function SettingsPageInner() {
   const [notionWorkspace, setNotionWorkspace] = useState<{ name: string; id: string } | null>(null)
   const [connected, setConnected] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     fetch('/api/notion/status')
@@ -51,8 +53,12 @@ function SettingsPageInner() {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault()
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    setSaving(true)
+    setTimeout(() => {
+      setSaving(false)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    }, 800)
   }
 
   const oauthError = searchParams.get('error')
@@ -192,8 +198,8 @@ function SettingsPageInner() {
                         onClick={() => save({ modelId: m.id as ModelId })}
                         className={`px-3 py-1.5 text-xs border transition-all ${
                           settings.modelId === m.id
-                            ? 'border-[#7b2fff] text-[#7b2fff] bg-[#7b2fff]/10'
-                            : 'border-border text-muted-foreground hover:border-[#7b2fff]/40'
+                            ? 'border-[#00ff88] text-[#00ff88] bg-[#00ff88]/10'
+                            : 'border-border text-muted-foreground hover:border-[#00ff88]/40'
                         }`}
                       >
                         {m.label}
@@ -217,8 +223,16 @@ function SettingsPageInner() {
                   />
                 </div>
 
-                <button type="submit" className="neon-btn px-6 py-2.5 self-start">
-                  {saved ? '✦ Saved' : 'Save Settings'}
+                <button
+                  type="submit"
+                  disabled={saving || saved}
+                  className="neon-btn px-6 py-2.5 self-start flex items-center gap-2 disabled:opacity-70"
+                >
+                  {saving ? (
+                    <><Loader2 size={14} className="animate-spin" /> Saving...</>
+                  ) : saved ? (
+                    <><Check size={14} /> Saved</>
+                  ) : 'Save Settings'}
                 </button>
               </section>
             </form>
