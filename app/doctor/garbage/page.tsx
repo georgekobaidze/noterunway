@@ -14,6 +14,7 @@ import {
   Unlink,
 } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
+import { InfoLinks } from '@/components/Landing/InfoLinks'
 import { CyberLoader } from '@/components/CyberLoader'
 import type { GarbagePage, GarbageScanResult } from '@/lib/notion/NotionClient'
 
@@ -290,9 +291,10 @@ export default function GarbagePage() {
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar
         rightSlot={
-          <Link href="/settings" className="neon-btn-ghost px-8 py-3 text-sm">
-            Settings
-          </Link>
+          <div className="flex items-center gap-3">
+            <InfoLinks />
+            <Link href="/dashboard" className="neon-btn-ghost text-sm w-32 text-center py-3">Dashboard</Link>
+          </div>
         }
       />
 

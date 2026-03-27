@@ -75,7 +75,7 @@ export default function Home() {
         <div className="flex items-center gap-4">
           <InfoLinks />
           {connected
-            ? <Link href="/dashboard" className="neon-btn px-8 py-3 text-sm">Go to Dashboard →</Link>
+            ? <Link href="/dashboard" className="neon-btn-ghost text-sm w-32 text-center py-3">Dashboard</Link>
             : <Link href="/settings" className="neon-btn px-8 py-3 text-sm">Connect Notion →</Link>
           }
         </div>

@@ -6,6 +6,7 @@ import { Navbar } from '@/components/Navbar'
 import { CyberLoader } from '@/components/CyberLoader'
 import { GitMerge, Trash2, Network, Sparkles, AlertTriangle, RefreshCw, ScanSearch, Link2Off, ShieldAlert } from 'lucide-react'
 import type { WorkspaceStats } from '@/lib/notion/NotionClient'
+import { InfoLinks } from '@/components/Landing/InfoLinks'
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 
@@ -30,23 +31,30 @@ function StatCard({ label, value, sub, accent = 'blue', loading, onScan, scanLab
   const { border, text } = colors[accent]
 
   return (
-    <div className={`glass-card rounded-xl p-6 border ${border} flex flex-col gap-2`}>
+    <div className={`glass-card rounded-xl p-6 border ${border} flex flex-col gap-2 min-h-[9rem]`}>
       <span className="text-xs font-mono uppercase tracking-widest text-muted-foreground">{label}</span>
-      {loading ? (
-        <CyberLoader />
-      ) : value !== null ? (
-        <span className={`text-4xl font-bold font-mono ${text}`}>{value}</span>
-      ) : (
-        onScan && (
-          <button
-            onClick={onScan}
-            className={`mt-1 flex items-center gap-1.5 text-[11px] font-mono ${text} opacity-60 hover:opacity-100 transition-opacity`}
-          >
-            <ScanSearch size={12} />
-            {scanLabel}
-          </button>
-        )
-      )}
+      <div className="flex flex-col gap-1 flex-1 justify-center">
+        {loading ? (
+          <CyberLoader />
+        ) : value !== null ? (
+          <span className={`text-4xl font-bold font-mono ${text}`}>{value}</span>
+        ) : (
+          onScan ? (
+            <button
+              onClick={onScan}
+              className={`group flex items-center gap-3 w-full text-left cursor-pointer ${text}`}
+            >
+              <ScanSearch size={24} className="opacity-70 group-hover:opacity-100 transition-opacity duration-200 shrink-0" />
+              <span
+                className="text-[11px] font-mono uppercase tracking-[0.15em] opacity-70 group-hover:opacity-100 transition-opacity duration-200"
+                style={{ fontFamily: 'var(--font-orbitron, Orbitron, sans-serif)' }}
+              >
+                {scanLabel === 'Rescan' ? '↻ Rescan' : 'Click to start scanning'}
+              </span>
+            </button>
+          ) : null
+        )}
+      </div>
       {sub && <span className="text-xs text-muted-foreground">{sub}</span>}
     </div>
   )
@@ -146,7 +154,10 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar rightSlot={
-        <Link href="/settings" className="neon-btn-ghost px-8 py-3 text-sm">Settings</Link>
+        <div className="flex items-center gap-3">
+          <InfoLinks />
+          <Link href="/settings" className="neon-btn-ghost text-sm w-32 text-center py-3">Settings</Link>
+        </div>
       } />
 
       <main className="flex-1 max-w-6xl mx-auto w-full px-6 py-10 flex flex-col gap-10">
@@ -188,51 +199,57 @@ export default function DashboardPage() {
 
           {/* Quick Stats */}
           <section className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <h2
-                className="text-xs font-semibold uppercase tracking-widest text-muted-foreground"
-                style={{ fontFamily: 'var(--font-orbitron), sans-serif' }}
-              >
-                Quick Stats
-              </h2>
-              <button
-                onClick={fetchStats}
-                disabled={statsLoading}
-                className="neon-btn-ghost px-3 py-1.5 text-[11px] flex items-center gap-1.5 disabled:opacity-40"
-              >
-                <RefreshCw size={11} className={statsLoading ? 'animate-spin' : ''} />
-                Refresh
-              </button>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <StatCard
-                label="Total Pages"
-                value={stats?.totalPages ?? null}
-                sub="in your workspace"
-                accent="blue"
-                loading={statsLoading}
-              />
-              <StatCard
-                label="Top-level Pages"
-                value={stats?.topLevelPages ?? null}
-                sub="no parent page"
-                accent="blue"
-                loading={statsLoading}
-              />
-              <StatCard
-                label="Recently Edited"
-                value={stats?.recentlyEditedPages ?? null}
-                sub="in the last 7 days"
-                accent="blue"
-                loading={statsLoading}
-              />
+            <h2
+              className="text-xs font-semibold uppercase tracking-widest neon-text"
+              style={{ fontFamily: 'var(--font-orbitron), sans-serif' }}
+            >
+              Quick Stats
+            </h2>
+            <div
+              className="flex flex-col gap-4 rounded-xl p-4"
+              style={{ border: '1px solid rgba(0,212,255,0.2)', background: 'rgba(0,212,255,0.02)' }}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-[rgba(0,212,255,0.5)] font-mono tracking-widest uppercase">Refreshable</span>
+                <button
+                  onClick={fetchStats}
+                  disabled={statsLoading}
+                  className="neon-btn-ghost px-3 py-1.5 text-[11px] flex items-center gap-1.5 disabled:opacity-40"
+                >
+                  <RefreshCw size={11} className={statsLoading ? 'animate-spin' : ''} />
+                  Refresh
+                </button>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <StatCard
+                  label="Total Pages"
+                  value={stats?.totalPages ?? null}
+                  sub="in your workspace"
+                  accent="blue"
+                  loading={statsLoading}
+                />
+                <StatCard
+                  label="Top-level Pages"
+                  value={stats?.topLevelPages ?? null}
+                  sub="no parent page"
+                  accent="blue"
+                  loading={statsLoading}
+                />
+                <StatCard
+                  label="Recently Edited"
+                  value={stats?.recentlyEditedPages ?? null}
+                  sub="in the last 7 days"
+                  accent="blue"
+                  loading={statsLoading}
+                />
+              </div>
             </div>
           </section>
 
           {/* Deep Scans */}
           <section className="flex flex-col gap-3">
             <h2
-              className="text-xs font-semibold uppercase tracking-widest text-muted-foreground"
+              className="text-xs font-semibold uppercase tracking-widest neon-text"
               style={{ fontFamily: 'var(--font-orbitron), sans-serif' }}
             >
               Deep Scans
@@ -262,7 +279,7 @@ export default function DashboardPage() {
           {/* Feature tools */}
           <section className="flex flex-col gap-3">
             <h2
-              className="text-xs font-semibold uppercase tracking-widest text-muted-foreground"
+              className="text-xs font-semibold uppercase tracking-widest neon-text"
               style={{ fontFamily: 'var(--font-orbitron), sans-serif' }}
             >
               Tools
