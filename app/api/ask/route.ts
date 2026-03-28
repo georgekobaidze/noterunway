@@ -26,13 +26,14 @@ You have tools to read the workspace:
 - get_page_content: read the actual text content/blocks of a page
 - run_analysis: run a built-in workspace analysis (dead_links, garbage, workspace_stats, or sensitive_data)
 
-When asked to make changes (archive pages, create pages, add/write/append to pages, replace page content):
+When asked to make changes (archive, create, rename pages, add/write/append to pages, replace page content):
 1. Use search_pages to find the relevant page(s) first — you MUST have the real page ID before calling propose_actions
 2. Extract the page ID from the search results (it is in the "id" field of each result object)
 3. Call propose_actions with a structured list of changes — do not skip this step
 4. Briefly tell the user what you've proposed
 
 IMPORTANT — choose the right action type for writes:
+- "rename" — changes the page title only, nothing else. Use when user says "rename", "change title", "change name"
 - "append" — adds content to the END of a page without touching existing content. Use when user says "add", "write", "append", "insert", or similar
 - "update" — REPLACES ALL existing content on the page. Only use when user explicitly says "replace", "overwrite", or "rewrite the whole page"
 - When in doubt, use "append" — it is non-destructive
@@ -209,7 +210,7 @@ export async function POST(req: NextRequest) {
             }),
 
             propose_actions: tool({
-              description: 'Propose write actions (archive, create, append to, or replace page content) that require user approval before execution',
+              description: 'Propose write actions (archive, create, rename, append to, or replace page content) that require user approval before execution',
               inputSchema: z.object({
                 summary: z.string().describe('Brief explanation of what you are proposing'),
                 actions: z.array(
@@ -225,6 +226,12 @@ export async function POST(req: NextRequest) {
                       parentPageId: z.string().describe('UUID of the parent page, or empty string "" for workspace root'),
                       title: z.string(),
                       content: z.string().default(''),
+                    }),
+                    z.object({
+                      type: z.literal('rename'),
+                      pageId: z.string(),
+                      pageTitle: z.string().describe('Current page title'),
+                      newTitle: z.string().describe('New title for the page'),
                     }),
                     z.object({
                       type: z.literal('append'),

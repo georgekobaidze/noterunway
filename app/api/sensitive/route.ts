@@ -11,25 +11,11 @@ function getNotionToken(req: NextRequest): string | null {
 }
 
 function sanitizeRedactedSnippet(snippet: string | null | undefined): string {
-  // Defensive server-side redaction: enforce a max length and mask everything
-  // after the first few visible characters, regardless of what the model returns.
-  if (!snippet) return ''
-
-  const MAX_LEN = 256
-  const VISIBLE_PREFIX = 4
-
-  let s = snippet.trim()
-  if (s.length > MAX_LEN) {
-    s = s.slice(0, MAX_LEN)
-  }
-
-  if (s.length <= VISIBLE_PREFIX) {
-    return '*'.repeat(s.length)
-  }
-
-  const prefix = s.slice(0, VISIBLE_PREFIX)
-  const masked = '*'.repeat(s.length - VISIBLE_PREFIX)
-  return prefix + masked
+  // Never reveal any prefix — prefixes can identify secret types (e.g. sk-proj → OpenAI key).
+  // The patternName and context fields provide enough identification for the user.
+  if (!snippet) return '[redacted]'
+  const len = Math.min(snippet.trim().length, 256)
+  return `[${len} chars redacted]`
 }
 
 const KNOWN_PATTERNS_DESCRIPTION = `
@@ -152,9 +138,10 @@ export async function GET(req: NextRequest) {
 
         for (const f of parsed.findings) {
           const sanitizedSnippet = sanitizeRedactedSnippet(f.redactedSnippet)
-          const key = `${pageId}:${sanitizedSnippet.toLowerCase()}`
-          if (regexKeys.has(key)) continue  // already caught by regex
-          regexKeys.add(key)                // prevent duplicates across chunks
+          // Dedup by page + pattern + category (not snippet, since it's now fully redacted)
+          const key = `${pageId}:${f.patternName.toLowerCase()}:${f.category}`
+          if (regexKeys.has(key)) continue
+          regexKeys.add(key)
           aiFindings.push({
             sourcePageId: pageId,
             sourcePageTitle: pageTitle,

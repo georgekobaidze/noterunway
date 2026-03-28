@@ -193,16 +193,27 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { archivePages, keepTitle, reason } = await req.json()
-    if (!Array.isArray(archivePages) || archivePages.length === 0) {
-      return NextResponse.json({ error: 'missing_archive_pages' }, { status: 400 })
+    const raw = await req.json().catch(() => null)
+    const parsed = z.object({
+      archivePages: z.array(z.object({
+        id: z.string().min(1),
+        title: z.string().optional(),
+      })).min(1),
+      keepTitle: z.string().optional(),
+      reason: z.string().optional(),
+    }).safeParse(raw)
+
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'invalid_request', details: parsed.error.flatten() }, { status: 400 })
     }
+
+    const { archivePages, keepTitle, reason } = parsed.data
 
     const notion = new NotionClient(token)
     const errors: string[] = []
 
     await Promise.all(
-      archivePages.map(async ({ id, title }: { id: string; title?: string }) => {
+      archivePages.map(async ({ id, title }) => {
         try {
           await notion.moveToArchive(id, 'duplicates', {
             title: title || '(untitled)',
@@ -218,7 +229,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      archivedIds: archivePages.filter(({ id }: { id: string }) => !errors.includes(id)).map(({ id }: { id: string }) => id),
+      archivedIds: archivePages.filter(({ id }) => !errors.includes(id)).map(({ id }) => id),
       failedIds: errors,
     })
   } catch (err: unknown) {

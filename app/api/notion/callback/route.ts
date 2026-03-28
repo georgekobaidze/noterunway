@@ -44,15 +44,27 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/settings?error=token_exchange_failed', req.url))
   }
 
-  const { access_token, workspace_name, workspace_id } = await tokenRes.json()
+  let tokenData: Record<string, unknown>
+  try {
+    tokenData = await tokenRes.json()
+  } catch {
+    return NextResponse.redirect(new URL('/settings?error=invalid_response', req.url))
+  }
+
+  const { access_token, workspace_name, workspace_id } = tokenData as {
+    access_token?: string; workspace_name?: string; workspace_id?: string
+  }
+  if (!access_token || typeof access_token !== 'string') {
+    return NextResponse.redirect(new URL('/settings?error=missing_token', req.url))
+  }
 
   // Pre-create the NoteRunway Archive folder structure in the user's workspace.
   // Best-effort — don't block the OAuth flow if this fails.
   try {
     const notion = new NotionClient(access_token)
     await notion.ensureArchiveStructure()
-  } catch {
-    // non-fatal — folders will be created on first use if this fails
+  } catch (err) {
+    console.error('Failed to create archive structure:', err)
   }
 
   // Store token in httpOnly cookie — never exposed to JavaScript

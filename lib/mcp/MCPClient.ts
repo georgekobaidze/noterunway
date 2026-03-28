@@ -52,8 +52,14 @@ export class MCPClient {
       },
     })
 
-    await this.client.connect(transport)
-    this.connected = true
+    try {
+      await this.client.connect(transport)
+      this.connected = true
+    } catch (err) {
+      // Kill the spawned subprocess to prevent orphan node.exe processes
+      try { await transport.close() } catch { /* already dead */ }
+      throw err
+    }
   }
 
   // Disconnect from the MCP server
@@ -106,7 +112,15 @@ export class MCPClient {
 
       // Parse the text as JSON if possible (Notion API returns JSON in text blocks)
       try {
-        return { tool: call.tool, success: true, data: JSON.parse(text) }
+        const parsed = JSON.parse(text)
+        // Notion API errors arrive as { object: 'error', ... } inside text blocks
+        // but MCP may not set the isError flag for them
+        if (parsed && typeof parsed === 'object' && parsed.object === 'error') {
+          const errMsg = parsed.message || parsed.code || text
+          console.error(`[MCPClient] Tool "${call.tool}" returned Notion API error:`, errMsg)
+          return { tool: call.tool, success: false, error: errMsg }
+        }
+        return { tool: call.tool, success: true, data: parsed }
       } catch {
         return { tool: call.tool, success: true, data: text }
       }

@@ -1137,33 +1137,33 @@ export class NotionClient {
     const inlineBlocks = originalBlocks.slice(0, INLINE_LIMIT)
     const overflowBlocks = originalBlocks.slice(INLINE_LIMIT)
 
-    let stubPageId: string | undefined
-    try {
-      const stubPage = await this.client.pages.create({
-        parent: { page_id: folderId },
-        properties: {
-          title: { title: [{ type: 'text', text: { content: stubTitle } }] },
-        },
-        children: [...bodyBlocks, ...inlineBlocks],
-      })
-      stubPageId = stubPage.id
+    // Create the audit stub — if this fails, abort archiving to avoid losing the page
+    const stubPage = await this.client.pages.create({
+      parent: { page_id: folderId },
+      properties: {
+        title: { title: [{ type: 'text', text: { content: stubTitle } }] },
+      },
+      children: [...bodyBlocks, ...inlineBlocks],
+    })
+    const stubPageId = stubPage.id
 
-      // Append any blocks beyond the inline limit
-      if (overflowBlocks.length > 0) {
-        const BATCH = 100
-        for (let i = 0; i < overflowBlocks.length; i += BATCH) {
+    // Append any blocks beyond the inline limit (best-effort)
+    if (overflowBlocks.length > 0) {
+      const BATCH = 100
+      for (let i = 0; i < overflowBlocks.length; i += BATCH) {
+        try {
           await this.client.blocks.children.append({
             block_id: stubPage.id,
             children: overflowBlocks.slice(i, i + BATCH),
           })
+        } catch {
+          break // partial content is acceptable
         }
       }
-    } catch {
-      // Non-fatal — still archive the original even if stub creation fails
     }
 
     // Recursively archive child pages nested inside this stub to preserve hierarchy
-    if (stubPageId && childPageIds.length > 0) {
+    if (childPageIds.length > 0) {
       for (const child of childPageIds) {
         try {
           await this.moveToArchiveInternal(child.id, stubPageId, feature, { title: child.title }, visited)
@@ -1220,7 +1220,13 @@ export class NotionClient {
       'quote', 'callout', 'toggle', 'code',
     ]
     if (richTextTypes.includes(b.type)) {
-      return { type: b.type, [b.type]: { ...inner, children: undefined } }
+      // Strip null/undefined fields — Notion API rejects explicit nulls on optional props like `icon`
+      const cleaned: Record<string, unknown> = {}
+      for (const [k, v] of Object.entries(inner)) {
+        if (k === 'children') continue
+        if (v != null) cleaned[k] = v
+      }
+      return { type: b.type, [b.type]: cleaned }
     }
 
     if (b.type === 'divider') return { type: 'divider', divider: {} }
