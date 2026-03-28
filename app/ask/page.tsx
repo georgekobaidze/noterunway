@@ -39,12 +39,11 @@ type Message = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SUGGESTIONS = [
-  'Find all pages related to authentication',
-  'Show me stale pages I should archive',
-  'Summarize my Q1 planning notes',
-  'Create a weekly standup template',
-  'What pages have no links to them?',
-  'Search for anything about onboarding',
+  'What pages do I have?',
+  'Search for a page',
+  'Summarize a page for me',
+  'Create a new page',
+  'Archive a page',
 ]
 
 const TOOL_LABELS: Record<string, string> = {
@@ -305,14 +304,17 @@ export default function AskPage() {
 
             {messages.length === 0 && (
               <div className="flex flex-col gap-5 py-4">
-                <div className="text-xs text-muted-foreground/40 leading-relaxed">
+                <div className="text-xs leading-relaxed" style={{ color: '#00d4ff' }}>
                   Ask anything about your Notion workspace. I can search, read, summarize, and propose changes.
                 </div>
                 <div className="flex flex-col gap-1">
                   {SUGGESTIONS.map(s => (
                     <button key={s} onClick={() => sendMessage(s)}
-                      className="text-left text-xs text-muted-foreground/40 hover:text-[#00d4ff]/70 transition-colors py-0.5 w-fit">
-                      <span className="text-muted-foreground/20 mr-2">$</span>{s}
+                      className="text-left text-xs transition-colors py-0.5 w-fit"
+                      style={{ color: '#00d4ff', opacity: 0.45 }}
+                      onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
+                      onMouseLeave={e => (e.currentTarget.style.opacity = '0.45')}>
+                      <span className="mr-2" style={{ color: '#00d4ff', opacity: 0.3 }}>$</span>{s}
                     </button>
                   ))}
                 </div>

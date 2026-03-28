@@ -33,8 +33,8 @@ When asked to make changes (archive pages, create pages, update page content):
 4. Briefly tell the user what you've proposed
 
 IMPORTANT for create actions:
-- Always search for the parent page first to get its ID
-- The parentPageId field MUST be the UUID from search results, not a name
+- If the user specifies a parent page, search for it first to get its UUID and set parentPageId to that UUID
+- If the user wants the page at workspace root (no parent / top level), set parentPageId to empty string ""
 - The content field can be an empty string "" if the user wants a blank page
 
 IMPORTANT for archive actions:
@@ -214,7 +214,7 @@ export async function POST(req: NextRequest) {
                     }),
                     z.object({
                       type: z.literal('create'),
-                      parentPageId: z.string(),
+                      parentPageId: z.string().describe('UUID of the parent page, or empty string "" for workspace root'),
                       title: z.string(),
                       content: z.string().default(''),
                     }),

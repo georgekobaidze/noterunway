@@ -74,7 +74,9 @@ export async function POST(req: NextRequest) {
         const createR = await mcpClient.executeTool({
           tool: 'API-post-page',
           parameters: {
-            parent: { page_id: action.parentPageId },
+            parent: action.parentPageId
+              ? { page_id: action.parentPageId }
+              : { workspace: true },
             properties: {
               title: {
                 title: [{ type: 'text', text: { content: action.title } }],
