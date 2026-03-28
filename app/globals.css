@@ -202,4 +202,19 @@
     background: rgba(0, 20, 40, 0.6);
     border: 1px solid rgba(0, 212, 255, 0.15);
   }
+
+  /* Terminal scrollbar */
+  .terminal-scroll::-webkit-scrollbar {
+    width: 4px;
+  }
+  .terminal-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .terminal-scroll::-webkit-scrollbar-thumb {
+    background: rgba(0, 212, 255, 0.2);
+    border-radius: 2px;
+  }
+  .terminal-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 212, 255, 0.45);
+  }
 }
