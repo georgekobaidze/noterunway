@@ -1004,8 +1004,8 @@ export class NotionClient {
   }
 
   // Moves a page to the archive folder for the given feature by:
-  // 1. Recursively archiving any child pages first (so they get their own stubs)
-  // 2. Creating an audit stub page in the feature subfolder
+  // 1. Creating an audit stub page in the feature subfolder
+  // 2. Recursively archiving any child pages into that stub (so they get their own stubs)
   // 3. Archiving (soft-deleting) the original page to Notion Trash
   // NOTE: Notion API does not support re-parenting existing pages, so the
   // stub acts as an audit record while the original goes to Trash.
