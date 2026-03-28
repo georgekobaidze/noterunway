@@ -1,6 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
-import { createRequire } from 'module'
+import path from 'path'
 
 // Destructive tools that require explicit user approval before execution.
 // Matches against substrings of tool names (API-prefixed, from @notionhq/notion-mcp-server).
@@ -40,24 +40,14 @@ export class MCPClient {
   // This uses the user's Notion OAuth access token (ntn_xxx) directly — no
   // separate MCP OAuth flow required.
   async connect(): Promise<void> {
-    const _require = createRequire(import.meta.url)
-    let serverBin: string
-    try {
-      serverBin = _require.resolve('@notionhq/notion-mcp-server/bin/cli.mjs')
-    } catch {
-      throw new MCPError(
-        'Cannot locate @notionhq/notion-mcp-server. Ensure the package is installed (`npm install`).'
-      )
-    }
+    const serverBin = path.join(process.cwd(), 'node_modules', '@notionhq', 'notion-mcp-server', 'bin', 'cli.mjs')
 
     const transport = new StdioClientTransport({
-      command: 'node',
+      command: process.execPath,
       args: [serverBin],
       env: {
         ...process.env,
         NOTION_TOKEN: this.accessToken,
-        // Suppress info/debug logs from the child process so they don't pollute
-        // our SSE stream. The server writes logs to stderr which is discarded.
         NODE_ENV: 'production',
       },
     })
@@ -101,10 +91,28 @@ export class MCPClient {
       const result = await this.client.callTool({
         name: call.tool,
         arguments: call.parameters,
-      })
-      return { tool: call.tool, success: true, data: result }
+      }) as { content?: { type: string; text?: string }[]; isError?: boolean }
+
+      // Extract readable text from MCP content blocks
+      const text = result.content
+        ?.filter((c) => c.type === 'text' && c.text)
+        .map((c) => c.text)
+        .join('\n') ?? ''
+
+      if (result.isError) {
+        console.error(`[MCPClient] Tool "${call.tool}" returned isError:`, text)
+        return { tool: call.tool, success: false, error: text || 'Tool returned an error' }
+      }
+
+      // Parse the text as JSON if possible (Notion API returns JSON in text blocks)
+      try {
+        return { tool: call.tool, success: true, data: JSON.parse(text) }
+      } catch {
+        return { tool: call.tool, success: true, data: text }
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
+      console.error(`[MCPClient] Tool "${call.tool}" threw:`, message)
       return { tool: call.tool, success: false, error: message }
     }
   }

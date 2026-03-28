@@ -168,9 +168,9 @@ export default function SensitiveDataPage() {
         <div className="flex flex-col gap-1">
           <Link
             href="/dashboard"
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-[#00d4ff] transition-colors w-fit mb-2"
+            className="flex items-center gap-2 text-sm font-medium text-[#00d4ff]/70 hover:text-[#00d4ff] transition-colors w-fit mb-3"
           >
-            <ArrowLeft size={12} /> Dashboard
+            <ArrowLeft size={15} /> Dashboard
           </Link>
           <h1
             className="text-2xl font-bold neon-text"
@@ -240,7 +240,7 @@ export default function SensitiveDataPage() {
             className="neon-btn px-6 py-2.5 flex items-center gap-2 disabled:opacity-40"
           >
             {scanning ? (
-              <><span className="animate-spin text-sm">⠋</span> Scanning…</>
+              <><span className="neon-spinner" /> Scanning…</>
             ) : (
               <><ScanSearch size={14} /> {result ? 'Rescan' : 'Scan Workspace'}</>
             )}

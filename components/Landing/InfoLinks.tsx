@@ -63,11 +63,11 @@ export function InfoLinks() {
             className="group flex items-center gap-0 text-xs cursor-pointer select-none"
             style={{ fontFamily: 'var(--font-orbitron, Orbitron, sans-serif)', letterSpacing: '0.1em', textTransform: 'uppercase' }}
           >
-            <span className="transition-all duration-200 text-[#00d4ff]/50 group-hover:text-[#00d4ff]">[</span>
-            <span className="px-1.5 transition-all duration-200 text-[#00d4ff]/80 group-hover:text-[#00d4ff]" style={{ textShadow: undefined }}>
+            <span className="transition-all duration-200 text-[#00d4ff]/70 group-hover:text-[#00d4ff]">[</span>
+            <span className="px-1.5 transition-all duration-200 text-[#00d4ff] group-hover:text-white" style={{ textShadow: '0 0 8px rgba(0,212,255,0.6)' }}>
               {LABELS[id]}
             </span>
-            <span className="transition-all duration-200 text-[#00d4ff]/50 group-hover:text-[#00d4ff]">]</span>
+            <span className="transition-all duration-200 text-[#00d4ff]/70 group-hover:text-[#00d4ff]">]</span>
           </button>
         ))}
       </nav>

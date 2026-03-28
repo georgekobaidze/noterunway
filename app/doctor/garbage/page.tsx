@@ -304,9 +304,9 @@ export default function GarbagePage() {
         <div className="flex flex-col gap-1">
           <Link
             href="/dashboard"
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-[#00d4ff] transition-colors w-fit mb-2"
+            className="flex items-center gap-2 text-sm font-medium text-[#00d4ff]/70 hover:text-[#00d4ff] transition-colors w-fit mb-3"
           >
-            <ArrowLeft size={12} /> Dashboard
+            <ArrowLeft size={15} /> Dashboard
           </Link>
           <h1
             className="text-2xl font-bold neon-text"
@@ -336,7 +336,7 @@ export default function GarbagePage() {
           >
             {scanning ? (
               <>
-                <span className="animate-spin text-sm">⠋</span> Scanning…
+                <span className="neon-spinner" /> Scanning…
               </>
             ) : (
               <>
@@ -420,7 +420,7 @@ export default function GarbagePage() {
               className="neon-btn px-5 py-2 text-xs flex items-center gap-1.5 disabled:opacity-40"
             >
               {archiving ? (
-                <><span className="animate-spin">⠋</span> Archiving…</>
+                <><span className="neon-spinner" /> Archiving…</>
               ) : (
                 <><Trash2 size={12} /> Archive {selected.size} page{selected.size !== 1 ? 's' : ''}</>
               )}

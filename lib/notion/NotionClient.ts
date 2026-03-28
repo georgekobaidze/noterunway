@@ -268,6 +268,20 @@ export class NotionClient {
         archived: true,
       })
     } catch (err: unknown) {
+      // Notion API doesn't support archived:true for workspace-level pages.
+      // Fall back to in_trash which works for all pages.
+      const msg = err instanceof Error ? err.message : ''
+      if (msg.toLowerCase().includes('workspace level')) {
+        try {
+          await this.client.pages.update({
+            page_id: pageId,
+            in_trash: true,
+          } as Parameters<typeof this.client.pages.update>[0])
+          return
+        } catch {
+          // ignore fallback error, throw original
+        }
+      }
       throw this.handleError(err)
     }
   }
@@ -989,22 +1003,69 @@ export class NotionClient {
     return { root: rootId, ...folderIds }
   }
 
+  // Maximum number of pages (root + descendants) archived in a single moveToArchive call.
+  // Prevents runaway recursion on unexpectedly large page trees while still preserving deep hierarchy.
+  private static readonly MAX_ARCHIVE_PAGES = 100
+
   // Moves a page to the archive folder for the given feature by:
   // 1. Creating an audit stub page in the feature subfolder
-  // 2. Archiving (soft-deleting) the original page to Notion Trash
+  // 2. Recursively archiving any child pages into that stub (so they get their own stubs)
+  // 3. Archiving (soft-deleting) the original page to Notion Trash
   // NOTE: Notion API does not support re-parenting existing pages, so the
   // stub acts as an audit record while the original goes to Trash.
   async moveToArchive(
     pageId: string,
     feature: ArchiveFeature,
-    meta?: { title?: string; reason?: string; keepTitle?: string }
+    meta?: { title?: string; reason?: string; keepTitle?: string },
   ): Promise<void> {
-    const ids = await this.ensureArchiveStructure()
-    const folderId = ids[feature]
+    const folderId = (await this.ensureArchiveStructure())[feature]
+    await this.moveToArchiveInternal(pageId, folderId, feature, meta, new Set<string>())
+  }
+
+  private async moveToArchiveInternal(
+    pageId: string,
+    parentId: string,
+    feature: ArchiveFeature,
+    meta: { title?: string; reason?: string; keepTitle?: string } | undefined,
+    visited: Set<string>,
+  ): Promise<void> {
+    if (visited.has(pageId)) return
+    if (visited.size >= NotionClient.MAX_ARCHIVE_PAGES) {
+      console.warn(`[moveToArchive] Reached MAX_ARCHIVE_PAGES (${NotionClient.MAX_ARCHIVE_PAGES}); skipping page ${pageId} and its descendants.`)
+      return
+    }
+    visited.add(pageId)
+
+    const folderId = parentId
+
     const date = new Date().toLocaleDateString('en-US', {
       year: 'numeric', month: 'long', day: 'numeric',
     })
     const stubTitle = meta?.title ? `${meta.title}` : '(untitled)'
+
+    // Discover child pages before archiving; visited-set prevents cycles and caps total pages processed
+    const childPageIds: Array<{ id: string; title: string }> = []
+    try {
+      let cursor: string | undefined
+      do {
+        const res = await this.client.blocks.children.list({
+          block_id: pageId,
+          page_size: 100,
+          ...(cursor ? { start_cursor: cursor } : {}),
+        })
+        for (const block of res.results) {
+          if (!('type' in block)) continue
+          const b = block as BlockObjectResponse
+          if (b.type === 'child_page') {
+            const childTitle = b.child_page?.title ?? '(untitled)'
+            childPageIds.push({ id: b.id, title: childTitle })
+          }
+        }
+        cursor = res.has_more ? res.next_cursor ?? undefined : undefined
+      } while (cursor)
+    } catch {
+      // Best-effort
+    }
 
     // Fetch original content before archiving so we can preserve it in the stub
     const originalBlocks = await this.fetchCopyableBlocks(pageId)
@@ -1076,6 +1137,7 @@ export class NotionClient {
     const inlineBlocks = originalBlocks.slice(0, INLINE_LIMIT)
     const overflowBlocks = originalBlocks.slice(INLINE_LIMIT)
 
+    let stubPageId: string | undefined
     try {
       const stubPage = await this.client.pages.create({
         parent: { page_id: folderId },
@@ -1084,6 +1146,7 @@ export class NotionClient {
         },
         children: [...bodyBlocks, ...inlineBlocks],
       })
+      stubPageId = stubPage.id
 
       // Append any blocks beyond the inline limit
       if (overflowBlocks.length > 0) {
@@ -1097,6 +1160,17 @@ export class NotionClient {
       }
     } catch {
       // Non-fatal — still archive the original even if stub creation fails
+    }
+
+    // Recursively archive child pages nested inside this stub to preserve hierarchy
+    if (stubPageId && childPageIds.length > 0) {
+      for (const child of childPageIds) {
+        try {
+          await this.moveToArchiveInternal(child.id, stubPageId, feature, { title: child.title }, visited)
+        } catch {
+          // Best-effort — don't let child failures block parent archiving
+        }
+      }
     }
 
     await this.archivePage(pageId)

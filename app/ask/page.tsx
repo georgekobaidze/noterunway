@@ -39,12 +39,11 @@ type Message = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SUGGESTIONS = [
-  'Find all pages related to authentication',
-  'Show me stale pages I should archive',
-  'Summarize my Q1 planning notes',
-  'Create a weekly standup template',
-  'What pages have no links to them?',
-  'Search for anything about onboarding',
+  'What pages do I have?',
+  'Search for a page',
+  'Summarize a page for me',
+  'Create a new page',
+  'Archive a page',
 ]
 
 const TOOL_LABELS: Record<string, string> = {
@@ -202,6 +201,7 @@ export default function AskPage() {
       ))
     } finally {
       setIsStreaming(false)
+      setTimeout(() => inputRef.current?.focus(), 50)
     }
   }, [messages, isStreaming, aiKey, settings.modelId])
 
@@ -213,7 +213,12 @@ export default function AskPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ actions }),
       })
-      const data = await res.json()
+      const text = await res.text()
+      const data = text ? JSON.parse(text) : {}
+
+      if (!res.ok) {
+        throw new Error(data.message ?? `Server error ${res.status}`)
+      }
 
       const lines = [
         ...(data.results ?? []).map((r: string) => `✓ ${r}`),
@@ -267,7 +272,7 @@ export default function AskPage() {
   const pendingApproval = messages.some(m => m.proposedActions != null)
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-screen overflow-hidden bg-background flex flex-col">
       <Navbar rightSlot={
         <div className="flex items-center gap-3">
           <InfoLinks />
@@ -275,15 +280,14 @@ export default function AskPage() {
         </div>
       } />
 
-      <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-4 py-4 gap-3">
-        <Link href="/dashboard" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-[#00d4ff] transition-colors w-fit">
-          <ArrowLeft size={12} /> Dashboard
+      <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-4 py-4 gap-3 overflow-hidden min-h-0">
+        <Link href="/dashboard" className="flex items-center gap-2 text-sm font-medium text-[#00d4ff]/70 hover:text-[#00d4ff] transition-colors w-fit">
+          <ArrowLeft size={15} /> Dashboard
         </Link>
 
         {/* Terminal window */}
         <div
-          className="flex-1 flex flex-col rounded-xl border border-white/10 bg-black/60 overflow-hidden font-mono text-sm"
-          style={{ minHeight: 'calc(100vh - 160px)' }}
+          className="flex-1 flex flex-col rounded-xl border border-white/10 bg-black/60 overflow-hidden font-mono text-sm min-h-0"
         >
           {/* Title bar */}
           <div className="flex items-center gap-2 px-4 py-2.5 border-b border-white/5 bg-white/[0.02] shrink-0">
@@ -296,18 +300,21 @@ export default function AskPage() {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          <div className="terminal-scroll flex-1 overflow-y-auto p-5 space-y-5">
 
             {messages.length === 0 && (
               <div className="flex flex-col gap-5 py-4">
-                <div className="text-xs text-muted-foreground/40 leading-relaxed">
+                <div className="text-xs leading-relaxed" style={{ color: '#00d4ff' }}>
                   Ask anything about your Notion workspace. I can search, read, summarize, and propose changes.
                 </div>
                 <div className="flex flex-col gap-1">
                   {SUGGESTIONS.map(s => (
                     <button key={s} onClick={() => sendMessage(s)}
-                      className="text-left text-xs text-muted-foreground/40 hover:text-[#00d4ff]/70 transition-colors py-0.5 w-fit">
-                      <span className="text-muted-foreground/20 mr-2">$</span>{s}
+                      className="text-left text-xs transition-colors py-0.5 w-fit"
+                      style={{ color: '#00d4ff', opacity: 0.45 }}
+                      onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
+                      onMouseLeave={e => (e.currentTarget.style.opacity = '0.45')}>
+                      <span className="mr-2" style={{ color: '#00d4ff', opacity: 0.3 }}>$</span>{s}
                     </button>
                   ))}
                 </div>
@@ -319,18 +326,18 @@ export default function AskPage() {
                 {msg.role === 'user' ? (
                   <div className="flex gap-2.5 items-start">
                     <span className="text-[#00d4ff] shrink-0 mt-px">❯</span>
-                    <span className="text-white/90 leading-relaxed">{msg.content}</span>
+                    <span className="text-[#00ff88]/90 leading-relaxed">{msg.content}</span>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-2 pl-5">
                     {/* Tool call steps */}
                     {msg.toolSteps.map(step => (
-                      <div key={step.stepId} className="flex items-center gap-2 text-xs text-muted-foreground/40">
+                      <div key={step.stepId} className="flex items-center gap-2 text-xs text-[#00d4ff]/30">
                         {step.done
                           ? (step.success
                             ? <span className="text-green-500/50">✓</span>
                             : <span className="text-red-500/50">✗</span>)
-                          : <span className="animate-spin inline-block text-[#00d4ff]/40">⠋</span>
+                          : <span className="neon-spinner" />
                         }
                         <span>{TOOL_LABELS[step.tool] ?? step.tool}</span>
                         {step.args.query != null && (
@@ -348,7 +355,7 @@ export default function AskPage() {
                     {/* AI response text */}
                     {msg.content && (
                       <div className={`leading-relaxed whitespace-pre-wrap text-sm ${
-                        msg.status === 'error' ? 'text-red-400/70' : 'text-foreground/80'
+                        msg.status === 'error' ? 'text-red-400/70' : 'text-[#00d4ff]/75'
                       }`}>
                         {msg.content}
                         {msg.status === 'streaming' && (
@@ -384,7 +391,7 @@ export default function AskPage() {
                             className="neon-btn px-4 py-1.5 text-xs disabled:opacity-40 flex items-center gap-1.5"
                           >
                             {executingId === msg.id
-                              ? <><span className="animate-spin">⠋</span> Executing…</>
+                           ? <><span className="neon-spinner" /> Executing…</>
                               : `Confirm (${msg.proposedActions.actions.length})`}
                           </button>
                           <button
@@ -426,7 +433,7 @@ export default function AskPage() {
                   onChange={e => setInput(e.target.value)}
                   disabled={isStreaming}
                   placeholder={isStreaming ? '' : 'Ask anything about your workspace…'}
-                  className="flex-1 bg-transparent outline-none text-white/90 placeholder:text-muted-foreground/25 disabled:opacity-40 text-sm"
+                  className="flex-1 bg-transparent outline-none text-[#00d4ff]/90 placeholder:text-[#00d4ff]/20 disabled:opacity-40 text-sm caret-[#00d4ff]"
                   autoComplete="off"
                   spellCheck={false}
                 />

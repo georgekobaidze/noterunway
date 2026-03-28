@@ -162,15 +162,17 @@
     text-transform: uppercase;
     color: #00d4ff;
     background: transparent;
-    border: 1px solid rgba(0, 212, 255, 0.5);
-    box-shadow: 0 0 8px rgba(0, 212, 255, 0.2);
+    border: 1px solid rgba(0, 212, 255, 0.6);
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.25), inset 0 0 8px rgba(0, 212, 255, 0.05);
+    text-shadow: 0 0 8px rgba(0, 212, 255, 0.6);
     clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
     transition: all 0.2s ease;
   }
   .neon-btn-ghost:hover {
-    color: #00d4ff;
-    border-color: rgba(0, 212, 255, 0.6);
-    box-shadow: 0 0 12px rgba(0, 212, 255, 0.3);
+    color: #fff;
+    border-color: #00d4ff;
+    box-shadow: 0 0 18px rgba(0, 212, 255, 0.5), inset 0 0 10px rgba(0, 212, 255, 0.1);
+    text-shadow: 0 0 10px rgba(0, 212, 255, 0.9);
   }
   .neon-btn-danger {
     position: relative;
@@ -199,5 +201,35 @@
   .dark .glass-card {
     background: rgba(0, 20, 40, 0.6);
     border: 1px solid rgba(0, 212, 255, 0.15);
+  }
+
+  /* Neon ring spinner — use <span class="neon-spinner" /> */
+  .neon-spinner {
+    display: inline-block;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 9999px;
+    border: 1.5px solid rgba(0, 212, 255, 0.2);
+    border-top-color: rgba(0, 212, 255, 0.7);
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Terminal scrollbar */
+  .terminal-scroll::-webkit-scrollbar {
+    width: 4px;
+  }
+  .terminal-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .terminal-scroll::-webkit-scrollbar-thumb {
+    background: rgba(0, 212, 255, 0.2);
+    border-radius: 2px;
+  }
+  .terminal-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 212, 255, 0.45);
   }
 }

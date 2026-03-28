@@ -61,10 +61,10 @@ function SettingsPageInner() {
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-6 py-12 flex flex-col gap-10">
         <div>
-          <h1 className="text-2xl font-bold mb-1" style={{ fontFamily: 'var(--font-orbitron), sans-serif' }}>
+          <h1 className="text-2xl font-bold neon-text mb-1" style={{ fontFamily: 'var(--font-orbitron), sans-serif' }}>
             Settings
           </h1>
-          <p className="text-muted-foreground text-sm">Connect your Notion workspace and configure your AI provider.</p>
+          <p className="text-sm font-mono" style={{ color: 'rgba(0,212,255,0.5)' }}>Connect your Notion workspace and configure your AI provider.</p>
         </div>
 
         {!loaded ? (

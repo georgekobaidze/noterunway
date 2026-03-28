@@ -127,7 +127,7 @@ function GroupCard({ group, onArchive, onSkip, archiving, archived }: GroupCardP
           className="neon-btn px-4 py-2 text-xs flex items-center gap-1.5 disabled:opacity-40"
         >
           {archiving ? (
-            <span className="flex items-center gap-1.5"><span className="animate-spin">⠋</span> Archiving…</span>
+            <span className="flex items-center gap-1.5"><span className="neon-spinner" /> Archiving…</span>
           ) : (
             <><GitMerge size={12} /> Archive {archiveIds.length} page{archiveIds.length !== 1 ? 's' : ''} · Keep &quot;{keepPage?.title || '(untitled)'}&quot;</>
           )}
@@ -240,13 +240,13 @@ export default function DuplicatesPage() {
 
         {/* Header */}
         <div className="flex flex-col gap-1">
-          <Link href="/dashboard" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-[#00d4ff] transition-colors w-fit mb-2">
-            <ArrowLeft size={12} /> Dashboard
+          <Link href="/dashboard" className="flex items-center gap-2 text-sm font-medium text-[#00d4ff]/70 hover:text-[#00d4ff] transition-colors w-fit mb-3">
+            <ArrowLeft size={15} /> Dashboard
           </Link>
           <h1 className="text-2xl font-bold neon-text" style={{ fontFamily: 'var(--font-orbitron), sans-serif' }}>
             Duplicate Detection
           </h1>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm" style={{ color: '#00d4ff' }}>
             AI scans your page titles and content to find duplicates — grouped so you choose which version to keep.
           </p>
         </div>
@@ -278,7 +278,7 @@ export default function DuplicatesPage() {
             className="neon-btn px-6 py-2.5 flex items-center gap-2 disabled:opacity-40"
           >
             {scanning ? (
-              <><span className="animate-spin text-sm">⠋</span> Scanning…</>
+              <><span className="neon-spinner" /> Scanning…</>
             ) : (
               <><ScanSearch size={14} /> {result ? 'Rescan' : 'Run AI Scan'}</>
             )}
