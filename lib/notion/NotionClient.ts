@@ -1045,8 +1045,7 @@ export class NotionClient {
             if (!('type' in block)) continue
             const b = block as BlockObjectResponse
             if (b.type === 'child_page') {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const childTitle = (b as any).child_page?.title ?? '(untitled)'
+              const childTitle = b.child_page?.title ?? '(untitled)'
               childPageIds.push({ id: b.id, title: childTitle })
             }
           }
