@@ -240,13 +240,13 @@ export default function DuplicatesPage() {
 
         {/* Header */}
         <div className="flex flex-col gap-1">
-          <Link href="/dashboard" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-[#00d4ff] transition-colors w-fit mb-2">
-            <ArrowLeft size={12} /> Dashboard
+          <Link href="/dashboard" className="flex items-center gap-2 text-sm font-medium text-[#00d4ff]/70 hover:text-[#00d4ff] transition-colors w-fit mb-3">
+            <ArrowLeft size={15} /> Dashboard
           </Link>
           <h1 className="text-2xl font-bold neon-text" style={{ fontFamily: 'var(--font-orbitron), sans-serif' }}>
             Duplicate Detection
           </h1>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm" style={{ color: '#00d4ff' }}>
             AI scans your page titles and content to find duplicates — grouped so you choose which version to keep.
           </p>
         </div>

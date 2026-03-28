@@ -459,8 +459,8 @@ export default function GraphPage() {
 
         {/* Header */}
         <div className="flex flex-col gap-1">
-          <Link href="/dashboard" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-[#00d4ff] transition-colors w-fit mb-2">
-            <ArrowLeft size={12} /> Dashboard
+          <Link href="/dashboard" className="flex items-center gap-2 text-sm font-medium text-[#00d4ff]/70 hover:text-[#00d4ff] transition-colors w-fit mb-3">
+            <ArrowLeft size={15} /> Dashboard
           </Link>
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
