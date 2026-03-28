@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
             break
           }
         }
-        if (!appendFailed) results.push(`Updated: ${action.pageTitle}`)
+        if (!appendFailed) results.push(`Appended to: ${action.pageTitle}`)
       } else if (action.type === 'update') {
         // Step 1: paginate through ALL existing blocks and delete them
         let cursor: string | undefined
