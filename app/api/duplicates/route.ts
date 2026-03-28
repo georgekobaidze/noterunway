@@ -159,7 +159,7 @@ export async function GET(req: NextRequest) {
         { role: 'user', content: userPrompt },
       ],
       temperature: 0,
-    })
+    })  
 
     // Post-process: clamp similarity to [0.6, 1] and filter groups that don't meet the threshold
     const validGroups = object.groups
