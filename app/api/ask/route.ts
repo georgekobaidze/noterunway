@@ -24,13 +24,18 @@ You have tools to read the workspace:
 - search_pages: search for pages by keyword or topic
 - get_page: read metadata of a specific page by its ID
 - get_page_content: read the actual text content/blocks of a page
-- run_analysis: run a built-in workspace analysis (dead_links, garbage, or workspace_stats)
+- run_analysis: run a built-in workspace analysis (dead_links, garbage, workspace_stats, or sensitive_data)
 
-When asked to make changes (archive pages, create pages, update page content):
+When asked to make changes (archive pages, create pages, add/write/append to pages, replace page content):
 1. Use search_pages to find the relevant page(s) first — you MUST have the real page ID before calling propose_actions
 2. Extract the page ID from the search results (it is in the "id" field of each result object)
 3. Call propose_actions with a structured list of changes — do not skip this step
 4. Briefly tell the user what you've proposed
+
+IMPORTANT — choose the right action type for writes:
+- "append" — adds content to the END of a page without touching existing content. Use when user says "add", "write", "append", "insert", or similar
+- "update" — REPLACES ALL existing content on the page. Only use when user explicitly says "replace", "overwrite", or "rewrite the whole page"
+- When in doubt, use "append" — it is non-destructive
 
 IMPORTANT for create actions:
 - If the user specifies a parent page, search for it first to get its UUID and set parentPageId to that UUID
@@ -46,7 +51,8 @@ Rules:
 - Never ask the user for a page ID — find it yourself with search_pages
 - Be concise — this is a terminal interface
 - When searching, prefer targeted queries over broad ones
-- For questions about orphaned pages, dead links, or stale pages — use run_analysis`
+- For questions about orphaned pages, dead links, or stale pages — use run_analysis
+- For questions about passwords, secrets, API keys, tokens, or any sensitive data in pages — use run_analysis with type "sensitive_data"`
 
 // ─── POST /api/ask — streaming agentic chat ───────────────────────────────────
 
@@ -174,9 +180,9 @@ export async function POST(req: NextRequest) {
             }),
 
             run_analysis: tool({
-              description: 'Run a workspace analysis. Use "dead_links" to find pages with broken/orphaned links, "garbage" to find stale/empty pages, or "workspace_stats" for a summary of the workspace.',
+              description: 'Run a workspace analysis. Use "dead_links" to find pages with broken/orphaned links, "garbage" to find stale/empty pages, "workspace_stats" for a summary, or "sensitive_data" to scan all pages for accidentally stored secrets, passwords, API keys, tokens, and PII.',
               inputSchema: z.object({
-                type: z.enum(['dead_links', 'garbage', 'workspace_stats']).describe('Which analysis to run'),
+                type: z.enum(['dead_links', 'garbage', 'workspace_stats', 'sensitive_data']).describe('Which analysis to run'),
               }),
               execute: async (input) => {
                 const stepId = `step-${++stepCounter}`
@@ -188,6 +194,8 @@ export async function POST(req: NextRequest) {
                     data = await notion.getDeadLinks()
                   } else if (input.type === 'garbage') {
                     data = await notion.getGarbagePages()
+                  } else if (input.type === 'sensitive_data') {
+                    data = await notion.getSensitiveFindings()
                   } else {
                     data = await notion.getWorkspaceStats()
                   }
@@ -201,7 +209,7 @@ export async function POST(req: NextRequest) {
             }),
 
             propose_actions: tool({
-              description: 'Propose write actions (archive, create, update pages) that require user approval before execution',
+              description: 'Propose write actions (archive, create, append to, or replace page content) that require user approval before execution',
               inputSchema: z.object({
                 summary: z.string().describe('Brief explanation of what you are proposing'),
                 actions: z.array(
@@ -217,6 +225,12 @@ export async function POST(req: NextRequest) {
                       parentPageId: z.string().describe('UUID of the parent page, or empty string "" for workspace root'),
                       title: z.string(),
                       content: z.string().default(''),
+                    }),
+                    z.object({
+                      type: z.literal('append'),
+                      pageId: z.string(),
+                      pageTitle: z.string(),
+                      content: z.string(),
                     }),
                     z.object({
                       type: z.literal('update'),

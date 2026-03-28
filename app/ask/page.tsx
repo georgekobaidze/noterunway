@@ -57,6 +57,7 @@ const TOOL_LABELS: Record<string, string> = {
 const ACTION_ICONS: Record<string, string> = {
   archive: '🗃',
   create: '📄',
+  append: '✍️',
   update: '✏️',
 }
 

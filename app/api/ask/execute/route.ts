@@ -19,6 +19,12 @@ const ActionSchema = z.discriminatedUnion('type', [
     content: z.string().default(''),
   }),
   z.object({
+    type: z.literal('append'),
+    pageId: z.string(),
+    pageTitle: z.string(),
+    content: z.string(),
+  }),
+  z.object({
     type: z.literal('update'),
     pageId: z.string(),
     pageTitle: z.string(),
@@ -109,6 +115,23 @@ export async function POST(req: NextRequest) {
         }
 
         results.push(`Created: ${action.title}`)
+      } else if (action.type === 'append') {
+        // Append content to the end of the page without touching existing blocks
+        const blocks = markdownToNotionBlocks(action.content)
+        let appendFailed = false
+        for (let i = 0; i < blocks.length; i += 100) {
+          const appendR = await mcpClient.executeTool({
+            tool: 'API-patch-block-children',
+            parameters: { block_id: action.pageId, children: blocks.slice(i, i + 100) },
+            approved: true,
+          })
+          if (!appendR.success) {
+            failedActions.push(`append to "${action.pageTitle}": ${appendR.error ?? 'Unknown error'}`)
+            appendFailed = true
+            break
+          }
+        }
+        if (!appendFailed) results.push(`Appended to: ${action.pageTitle}`)
       } else if (action.type === 'update') {
         // Step 1: paginate through ALL existing blocks and delete them
         let cursor: string | undefined
