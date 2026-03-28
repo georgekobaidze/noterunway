@@ -127,7 +127,7 @@ function GroupCard({ group, onArchive, onSkip, archiving, archived }: GroupCardP
           className="neon-btn px-4 py-2 text-xs flex items-center gap-1.5 disabled:opacity-40"
         >
           {archiving ? (
-            <span className="flex items-center gap-1.5"><span className="animate-spin">⠋</span> Archiving…</span>
+            <span className="flex items-center gap-1.5"><span className="neon-spinner" /> Archiving…</span>
           ) : (
             <><GitMerge size={12} /> Archive {archiveIds.length} page{archiveIds.length !== 1 ? 's' : ''} · Keep &quot;{keepPage?.title || '(untitled)'}&quot;</>
           )}
@@ -278,7 +278,7 @@ export default function DuplicatesPage() {
             className="neon-btn px-6 py-2.5 flex items-center gap-2 disabled:opacity-40"
           >
             {scanning ? (
-              <><span className="animate-spin text-sm">⠋</span> Scanning…</>
+              <><span className="neon-spinner" /> Scanning…</>
             ) : (
               <><ScanSearch size={14} /> {result ? 'Rescan' : 'Run AI Scan'}</>
             )}

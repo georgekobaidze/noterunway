@@ -156,7 +156,7 @@ export default function DeadLinksPage() {
             className="neon-btn px-6 py-2.5 flex items-center gap-2 disabled:opacity-40"
           >
             {scanning ? (
-              <><span className="animate-spin text-sm">⠋</span> Scanning…</>
+              <><span className="neon-spinner" /> Scanning…</>
             ) : (
               <><ScanSearch size={14} /> {result ? 'Rescan' : 'Scan Workspace'}</>
             )}

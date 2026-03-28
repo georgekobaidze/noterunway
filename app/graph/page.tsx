@@ -472,7 +472,7 @@ export default function GraphPage() {
               </p>
             </div>
             <button onClick={load} disabled={loading} className="neon-btn px-6 py-2.5 flex items-center gap-2 disabled:opacity-40">
-              {loading ? <><span className="animate-spin">⠋</span> Loading…</> : <><ScanSearch size={14} /> {graphData ? 'Reload' : 'Load Graph'}</>}
+              {loading ? <><span className="neon-spinner" /> Loading…</> : <><ScanSearch size={14} /> {graphData ? 'Reload' : 'Load Graph'}</>}
             </button>
           </div>
         </div>

@@ -203,6 +203,21 @@
     border: 1px solid rgba(0, 212, 255, 0.15);
   }
 
+  /* Neon ring spinner — use <span class="neon-spinner" /> */
+  .neon-spinner {
+    display: inline-block;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 9999px;
+    border: 1.5px solid rgba(0, 212, 255, 0.2);
+    border-top-color: rgba(0, 212, 255, 0.7);
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
   /* Terminal scrollbar */
   .terminal-scroll::-webkit-scrollbar {
     width: 4px;

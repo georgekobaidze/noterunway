@@ -337,7 +337,7 @@ export default function AskPage() {
                           ? (step.success
                             ? <span className="text-green-500/50">✓</span>
                             : <span className="text-red-500/50">✗</span>)
-                          : <span className="inline-block w-3 h-3 rounded-full border border-[#00d4ff]/20 border-t-[#00d4ff]/70 animate-spin shrink-0" />
+                          : <span className="neon-spinner" />
                         }
                         <span>{TOOL_LABELS[step.tool] ?? step.tool}</span>
                         {step.args.query != null && (
@@ -391,7 +391,7 @@ export default function AskPage() {
                             className="neon-btn px-4 py-1.5 text-xs disabled:opacity-40 flex items-center gap-1.5"
                           >
                             {executingId === msg.id
-                           ? <><span className="inline-block w-3 h-3 rounded-full border border-[#00d4ff]/20 border-t-[#00d4ff]/70 animate-spin" /> Executing…</>
+                           ? <><span className="neon-spinner" /> Executing…</>
                               : `Confirm (${msg.proposedActions.actions.length})`}
                           </button>
                           <button
