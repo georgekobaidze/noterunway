@@ -19,6 +19,12 @@ const ActionSchema = z.discriminatedUnion('type', [
     content: z.string().default(''),
   }),
   z.object({
+    type: z.literal('rename'),
+    pageId: z.string(),
+    pageTitle: z.string(),
+    newTitle: z.string(),
+  }),
+  z.object({
     type: z.literal('append'),
     pageId: z.string(),
     pageTitle: z.string(),
@@ -98,9 +104,9 @@ export async function POST(req: NextRequest) {
 
         // Step 2: append content blocks via MCP
         const newPageId = (createR.data as { id?: string } | null)?.id
+        let createContentFailed = false
         if (newPageId && action.content.trim()) {
           const blocks = markdownToNotionBlocks(action.content)
-          // Notion API allows at most 100 blocks per append call
           for (let i = 0; i < blocks.length; i += 100) {
             const appendR = await mcpClient.executeTool({
               tool: 'API-patch-block-children',
@@ -109,12 +115,30 @@ export async function POST(req: NextRequest) {
             })
             if (!appendR.success) {
               failedActions.push(`add content to "${action.title}": ${appendR.error ?? 'Unknown error'}`)
+              createContentFailed = true
               break
             }
           }
         }
 
-        results.push(`Created: ${action.title}`)
+        if (!createContentFailed) results.push(`Created: ${action.title}`)
+        else results.push(`Created "${action.title}" (page shell only — content failed)`)
+      } else if (action.type === 'rename') {
+        const renameR = await mcpClient.executeTool({
+          tool: 'API-patch-page',
+          parameters: {
+            page_id: action.pageId,
+            properties: {
+              title: { title: [{ type: 'text', text: { content: action.newTitle } }] },
+            },
+          },
+          approved: true,
+        })
+        if (renameR.success) {
+          results.push(`Renamed: "${action.pageTitle}" → "${action.newTitle}"`)
+        } else {
+          failedActions.push(`rename "${action.pageTitle}": ${renameR.error ?? 'Unknown error'}`)
+        }
       } else if (action.type === 'append') {
         // Append content to the end of the page without touching existing blocks
         const blocks = markdownToNotionBlocks(action.content)
@@ -136,6 +160,7 @@ export async function POST(req: NextRequest) {
         // Step 1: paginate through ALL existing blocks and delete them
         let cursor: string | undefined
         let fetchFailed = false
+        let deletionFailed = false
         do {
           const params: Record<string, unknown> = { block_id: action.pageId }
           if (cursor) params.start_cursor = cursor
@@ -160,19 +185,24 @@ export async function POST(req: NextRequest) {
           const existing = page?.results ?? []
           for (const block of existing) {
             if (block.id) {
-              await mcpClient.executeTool({
+              const delR = await mcpClient.executeTool({
                 tool: 'API-delete-a-block',
                 parameters: { block_id: block.id },
                 approved: true,
               })
+              if (!delR.success) {
+                deletionFailed = true
+                break
+              }
             }
           }
+          if (deletionFailed) break
 
           cursor = page?.has_more ? page.next_cursor ?? undefined : undefined
         } while (cursor)
 
-        if (fetchFailed) {
-          failedActions.push(`update "${action.pageTitle}": failed to fetch existing blocks`)
+        if (fetchFailed || deletionFailed) {
+          failedActions.push(`update "${action.pageTitle}": failed to ${fetchFailed ? 'fetch' : 'delete'} existing blocks — page left in partial state`)
           continue
         }
 

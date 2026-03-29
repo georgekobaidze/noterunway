@@ -12,6 +12,8 @@ import { useSettings } from '@/lib/hooks/useSettings'
 type Action =
   | { type: 'archive'; pageId: string; pageTitle: string; reason: string }
   | { type: 'create'; parentPageId: string; title: string; content: string }
+  | { type: 'rename'; pageId: string; pageTitle: string; newTitle: string }
+  | { type: 'append'; pageId: string; pageTitle: string; content: string }
   | { type: 'update'; pageId: string; pageTitle: string; content: string }
 
 type ToolStep = {
@@ -57,6 +59,7 @@ const TOOL_LABELS: Record<string, string> = {
 const ACTION_ICONS: Record<string, string> = {
   archive: '🗃',
   create: '📄',
+  rename: '🏷️',
   append: '✍️',
   update: '✏️',
 }
@@ -311,11 +314,8 @@ export default function AskPage() {
                 <div className="flex flex-col gap-1">
                   {SUGGESTIONS.map(s => (
                     <button key={s} onClick={() => sendMessage(s)}
-                      className="text-left text-xs transition-colors py-0.5 w-fit"
-                      style={{ color: '#00d4ff', opacity: 0.45 }}
-                      onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
-                      onMouseLeave={e => (e.currentTarget.style.opacity = '0.45')}>
-                      <span className="mr-2" style={{ color: '#00d4ff', opacity: 0.3 }}>$</span>{s}
+                      className="text-left text-xs transition-opacity py-0.5 w-fit text-[#00d4ff] opacity-[0.45] hover:opacity-80">
+                      <span className="mr-2 text-[#00d4ff] opacity-30">$</span>{s}
                     </button>
                   ))}
                 </div>
@@ -378,6 +378,9 @@ export default function AskPage() {
                               <div className="text-muted-foreground/70">
                                 <span className="text-amber-300/70 mr-1.5">{a.type}</span>
                                 <span>{'pageTitle' in a ? a.pageTitle : ('title' in a ? a.title : '')}</span>
+                                {'newTitle' in a && (
+                                  <span className="text-muted-foreground/50 ml-1.5">→ {a.newTitle}</span>
+                                )}
                                 {'reason' in a && (
                                   <span className="text-muted-foreground/35 ml-1.5">— {a.reason}</span>
                                 )}

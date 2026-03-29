@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { NotionClient } from '@/lib/notion/NotionClient'
 
 function getNotionToken(req: NextRequest): string | null {
@@ -38,11 +39,20 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { pages, reason } = await req.json()
-    if (!Array.isArray(pages) || pages.length === 0) {
-      return NextResponse.json({ error: 'missing_pages' }, { status: 400 })
+    const raw = await req.json().catch(() => null)
+    const parsed = z.object({
+      pages: z.array(z.object({
+        id: z.string().min(1),
+        title: z.string().default('(untitled)'),
+      })).min(1),
+      reason: z.string().optional(),
+    }).safeParse(raw)
+
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'invalid_request', details: parsed.error.flatten() }, { status: 400 })
     }
 
+    const { pages, reason } = parsed.data
     const notion = new NotionClient(token)
     const failedIds = new Set<string>()
     const concurrency = 5
