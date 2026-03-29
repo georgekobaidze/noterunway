@@ -169,7 +169,7 @@ Scans all page content (including nested blocks, toggles, callouts) against 13 p
 | Password in Code     | `password=...`, `secret:...`              |
 | Credit Card          | Visa, Mastercard, Amex, Discover patterns |
 
-All findings are **redacted** — only `[N chars redacted]` is shown, never the full value.
+All findings are **partially redacted** — values are shown as a snippet (first 8 characters + last 4, or first 4 for short matches), never the full value.
 
 **Phase 2 — AI Deep Scan (optional):**
 
