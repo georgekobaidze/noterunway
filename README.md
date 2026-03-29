@@ -261,7 +261,7 @@ Natural language interface to your workspace. The most powerful tool in NoteRunw
 ## Architecture
 
 <div align="center">
-  <img src="/public/images/architecture.png" alt="NoteRunway Architecture" width="600" />
+  <img src="public/images/architecture.png" alt="NoteRunway Architecture" width="600" />
 </div>
 
 ### Key Design Decisions
