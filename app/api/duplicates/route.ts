@@ -88,7 +88,8 @@ export async function GET(req: NextRequest) {
     const titleById = new Map(allMeta.map((p) => [p.id, p.title || '(no title)']))
 
     // Exclude the NoteRunway Archive root and all its descendants from duplicate scanning.
-    // Walking up the parent chain (max 10 hops) handles deeply nested archive sub-pages.
+    // Walks up the parent chain until the archive root is found, a missing parent is encountered,
+    // or a cycle is detected (cycle-safe via a visited set).
     const parentById = new Map(allMeta.map((p) => [p.id, p.parentId]))
     const archiveRootId = allMeta.find((p) => p.title === 'NoteRunway Archive')?.id ?? null
 
