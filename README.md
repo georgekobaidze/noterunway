@@ -173,8 +173,8 @@ All findings are **redacted** — only `[N chars redacted]` is shown, never the 
 Sends page text to the LLM to catch natural-language secrets that regex misses (e.g., *"the password is hunter2"*, *"login: admin/password123"*).
 
 **API:**
-- `GET /api/sensitive` — Regex scan
-- `POST /api/sensitive` — AI deep scan (with Zod-validated body)
+- `GET /api/sensitive` — Regex-only scan
+- `GET /api/sensitive?deepAI=true` — Regex + AI deep scan (requires `x-ai-key` and `x-ai-model` headers)
 
 > **Dependencies:** `NotionClient.getSensitiveFindings()`, `getAllPagesWithText()`, `getModelWithKey()`
 > **AI Required:** Phase 1 no, Phase 2 yes
