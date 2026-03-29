@@ -101,7 +101,7 @@ export async function GET(req: NextRequest) {
     // For each page that has text, send content to AI to find natural-language secrets.
     // We build a set of (pageId, lowerSnippet) pairs from regex findings to deduplicate.
     const regexKeys = new Set(
-      result.findings.map((f) => `${f.sourcePageId}:${f.redactedSnippet.toLowerCase()}`)
+      result.findings.map((f) => `${f.sourcePageId}:${f.patternName.toLowerCase()}:${f.category}`)
     )
 
     const aiFindings: SensitiveFinding[] = []
