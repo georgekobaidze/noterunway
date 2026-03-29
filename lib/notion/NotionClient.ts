@@ -1156,7 +1156,13 @@ export class NotionClient {
             block_id: stubPage.id,
             children: overflowBlocks.slice(i, i + BATCH),
           })
-        } catch {
+        } catch (error) {
+          console.warn('Failed to append overflow blocks to audit stub', {
+            stubPageId,
+            batchStart: i,
+            batchSize: BATCH,
+            error,
+          })
           break // partial content is acceptable
         }
       }
