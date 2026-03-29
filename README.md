@@ -9,9 +9,8 @@ Clean, organize, and command your Notion workspace with AI. Powered by the Notio
 <img src="./public/images/poster.png" alt="NoteRunway" />
 
 🔗 **[Live Demo → noterunway.pilotronica.com](https://noterunway.pilotronica.com/)**  
-📝 **[DEV.to Article → Read the write-up](https://dev.to/georgekobaidze/noterunway-because-your-notion-workspace-deserves-an-elite-crew-53bk)**
-
-[![Watch on YouTube](https://img.youtube.com/vi/qtaKv66-8AY/maxresdefault.jpg)](https://youtu.be/qtaKv66-8AY?si=pENs8eMzsa6ClZTL)
+📝 **[DEV.to Article → Read the write-up](https://dev.to/georgekobaidze/noterunway-because-your-notion-workspace-deserves-an-elite-crew-53bk)**  
+▶️ **[YouTube → Watch the demo](https://youtu.be/qtaKv66-8AY?si=pENs8eMzsa6ClZTL)**
 
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)](https://typescriptlang.org/)
