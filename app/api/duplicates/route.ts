@@ -113,6 +113,11 @@ export async function GET(req: NextRequest) {
     // Fetch content snippets for up to 100 non-archive pages (most recently edited first).
     const candidates = allMeta
       .filter((p) => p.id !== archiveRootId && !isInsideArchive(p.id))
+      .sort((a, b) => {
+        const aTime = (a as any).lastEdited ?? 0
+        const bTime = (b as any).lastEdited ?? 0
+        return bTime - aTime
+      })
       .slice(0, 100)
     const BATCH = 15
     const pagesWithContent: Array<PageMeta & { contentSnippet: string }> = []
