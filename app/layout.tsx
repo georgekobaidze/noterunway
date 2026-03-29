@@ -19,7 +19,7 @@ const orbitron = Orbitron({
 });
 
 export const metadata: Metadata = {
-  title: 'NoteRunway — AI-powered Notion workspace management',
+  title: 'NoteRunway: AI-powered Notion workspace management',
   description:
     'Detect duplicates, collect garbage, visualize dependencies, and run natural language instructions on your Notion workspace — powered by Notion MCP.',
 };
