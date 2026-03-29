@@ -8,6 +8,8 @@ Clean, organize, and command your Notion workspace with AI. Powered by the Notio
 
 <img src="./public/images/poster.png" alt="NoteRunway" />
 
+🔗 **[Live Demo → noterunway.pilotronica.com](https://noterunway.pilotronica.com/)**
+
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)](https://typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38bdf8?logo=tailwindcss)](https://tailwindcss.com/)
