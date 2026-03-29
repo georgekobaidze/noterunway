@@ -4,7 +4,7 @@ import path from 'path'
 
 // Destructive tools that require explicit user approval before execution.
 // Matches against substrings of tool names (API-prefixed, from @notionhq/notion-mcp-server).
-const DESTRUCTIVE_TOOLS = ['patch', 'post-page', 'delete-a-block', 'api-post-page', 'move-page', 'update-a-data-source', 'create-a-data-source']
+const DESTRUCTIVE_TOOLS = ['patch', 'post-page', 'delete-a-block', 'move-page', 'update-a-data-source', 'create-a-data-source']
 
 export interface MCPToolCall {
   tool: string

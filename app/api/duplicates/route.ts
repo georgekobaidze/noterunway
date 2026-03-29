@@ -111,7 +111,7 @@ export async function GET(req: NextRequest) {
       return false
     }
 
-    // Fetch content snippets for up to 100 non-archive pages (most recently edited first).
+    // Fetch content snippets for up to 100 non-archive pages.
     const candidates = allMeta
       .filter((p) => p.id !== archiveRootId && !isInsideArchive(p.id))
       .sort((a, b) => {
@@ -190,7 +190,7 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/duplicates
-// Body: { archiveIds: string[], keepId: string, keepTitle: string, reason: string }
+// Body: { archivePages: [{id, title?}], keepTitle?: string, reason?: string }
 // Archives all confirmed duplicate pages (user-approved action).
 export async function POST(req: NextRequest) {
   const token = getNotionToken(req)
