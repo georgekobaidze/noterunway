@@ -92,7 +92,7 @@ AI-powered semantic duplicate detection with structured output.
 - `GET /api/duplicates` — AI scan (reads `x-ai-key`, `x-ai-model` headers)
 - `POST /api/duplicates` — Archive confirmed duplicates (Zod-validated body)
 
-> **Dependencies:** `DuplicateDetectionPromptBuilder`, `NotionClient.getAllPages()`, `getPageSnippetWithMeta()`, `moveToArchive()`
+> **Dependencies:** `/api/duplicates` route (GET/POST handlers), duplicate detection `SYSTEM_PROMPT`, duplicates Zod schema, `NotionClient.getAllPages()`, `getPageSnippetWithMeta()`, `moveToArchive()`
 > **AI Required:** Yes — uses `generateObject()` with structured Zod schema at temperature 0
 
 ---
