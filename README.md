@@ -84,7 +84,7 @@ AI-powered semantic duplicate detection with structured output.
 **How it works:**
 1. Fetches up to 100 non-archive pages with title + content snippet (600 chars max)
 2. Sends to LLM with a specialized system prompt and Zod schema
-3. AI returns duplicate groups with similarity scores (threshold: ≥ 85%)
+3. AI returns duplicate groups with similarity scores (clamped between 0.60 and 1.00, shown when confidence ≥ 0.60)
 4. UI shows grouped pages with the AI's recommended "keep" pick (⭐)
 5. User selects which pages to archive → pages go to `NoteRunway Archive/Duplicates` with full audit trail
 
