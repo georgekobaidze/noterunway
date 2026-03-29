@@ -44,12 +44,12 @@ It connects to your Notion workspace through OAuth, runs server-side analysis vi
 
 ### Core Principles
 
-| Principle             | Description                                                                   |
-| --------------------- | ----------------------------------------------------------------------------- |
-| **Zero Lock-in**      | Your data stays in Notion. NoteRunway never stores workspace content.         |
-| **Human-in-the-Loop** | No destructive action runs without explicit user approval.                    |
-| **Privacy First**     | AI keys stored in your browser only (BYOK). Never sent to NoteRunway servers. |
-| **Transparency**      | Every AI decision shows reasoning, similarity scores, and proposed actions.   |
+| Principle             | Description                                                                                         |
+| --------------------- | --------------------------------------------------------------------------------------------------- |
+| **Zero Lock-in**      | Your data stays in Notion. NoteRunway never stores workspace content.                             |
+| **Human-in-the-Loop** | No destructive action runs without explicit user approval.                                        |
+| **Privacy First**     | AI keys stored only in your browser (BYOK). Sent per-request to NoteRunway APIs and never persisted server-side. |
+| **Transparency**      | Every AI decision shows reasoning, similarity scores, and proposed actions.                       |
 
 ---
 
