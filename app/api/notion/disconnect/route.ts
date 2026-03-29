@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 
+const appUrl = process.env.APP_URL ?? 'http://localhost:3000'
+
 export async function POST() {
   const response = NextResponse.redirect(
-    new URL('/', process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'),
+    new URL('/', appUrl),
     { status: 303 },
   )
   response.cookies.delete('notion_token')

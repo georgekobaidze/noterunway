@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { NotionClient } from '@/lib/notion/NotionClient'
 
+const appUrl = process.env.APP_URL ?? 'http://localhost:3000'
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const code = searchParams.get('code')
@@ -8,13 +10,13 @@ export async function GET(req: NextRequest) {
   const state = searchParams.get('state')
 
   if (error || !code) {
-    return NextResponse.redirect(new URL('/settings?error=access_denied', req.url))
+    return NextResponse.redirect(new URL('/settings?error=access_denied', appUrl))
   }
 
   // Validate OAuth state parameter to prevent CSRF/login swapping
   const storedState = req.cookies.get('notion_oauth_state')?.value
   if (!state || !storedState || state !== storedState) {
-    return NextResponse.redirect(new URL('/settings?error=invalid_state', req.url))
+    return NextResponse.redirect(new URL('/settings?error=invalid_state', appUrl))
   }
 
   const clientId = process.env.NOTION_OAUTH_CLIENT_ID
@@ -22,7 +24,7 @@ export async function GET(req: NextRequest) {
   const redirectUri = process.env.NOTION_OAUTH_REDIRECT_URI
 
   if (!clientId || !clientSecret || !redirectUri) {
-    return NextResponse.redirect(new URL('/settings?error=not_configured', req.url))
+    return NextResponse.redirect(new URL('/settings?error=not_configured', appUrl))
   }
 
   // Exchange authorization code for access token
@@ -41,21 +43,21 @@ export async function GET(req: NextRequest) {
   })
 
   if (!tokenRes.ok) {
-    return NextResponse.redirect(new URL('/settings?error=token_exchange_failed', req.url))
+    return NextResponse.redirect(new URL('/settings?error=token_exchange_failed', appUrl))
   }
 
   let tokenData: Record<string, unknown>
   try {
     tokenData = await tokenRes.json()
   } catch {
-    return NextResponse.redirect(new URL('/settings?error=invalid_response', req.url))
+    return NextResponse.redirect(new URL('/settings?error=invalid_response', appUrl))
   }
 
   const { access_token, workspace_name, workspace_id } = tokenData as {
     access_token?: string; workspace_name?: string; workspace_id?: string
   }
   if (!access_token || typeof access_token !== 'string') {
-    return NextResponse.redirect(new URL('/settings?error=missing_token', req.url))
+    return NextResponse.redirect(new URL('/settings?error=missing_token', appUrl))
   }
 
   // Pre-create the NoteRunway Archive folder structure in the user's workspace.
@@ -68,7 +70,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Store token in httpOnly cookie — never exposed to JavaScript
-  const response = NextResponse.redirect(new URL('/settings?connected=true', req.url))
+  const response = NextResponse.redirect(new URL('/settings?connected=true', appUrl))
   response.cookies.set('notion_token', access_token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
