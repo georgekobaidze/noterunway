@@ -148,7 +148,7 @@ function SettingsPageInner() {
               </h2>
 
               <p className="text-muted-foreground text-xs -mt-2">
-                Your key is stored in browser localStorage only — never sent to NoteRunway&apos;s servers.
+                Your key is stored in browser localStorage only and sent per-request to NoteRunway&apos;s APIs via a request header — it is never persisted server-side.
               </p>
 
               {/* Provider selector */}
