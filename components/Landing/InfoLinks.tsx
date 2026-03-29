@@ -52,10 +52,20 @@ export function InfoLinks() {
     }
   }, [])
 
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  // Close mobile menu on outside click
+  useEffect(() => {
+    if (!menuOpen) return
+    const handler = () => setMenuOpen(false)
+    window.addEventListener('click', handler)
+    return () => window.removeEventListener('click', handler)
+  }, [menuOpen])
+
   return (
     <>
-      {/* Nav links */}
-      <nav className="flex items-center gap-3">
+      {/* Desktop nav links (hidden below 820px) */}
+      <nav className="hidden min-[820px]:flex items-center gap-3">
         {(['built-by', 'contribute', 'whats-next'] as Panel[]).map((id) => (
           <button
             key={id}
@@ -71,6 +81,38 @@ export function InfoLinks() {
           </button>
         ))}
       </nav>
+
+      {/* Mobile menu button (visible below 820px) */}
+      <div className="relative min-[820px]:hidden">
+        <button
+          onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v) }}
+          className="flex items-center justify-center w-9 h-9 rounded border border-[#00d4ff]/30 bg-[#00d4ff]/5 text-[#00d4ff] hover:bg-[#00d4ff]/10 transition-colors cursor-pointer"
+          aria-label="Menu"
+        >
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <line x1="3" y1="5" x2="15" y2="5" />
+            <line x1="3" y1="9" x2="15" y2="9" />
+            <line x1="3" y1="13" x2="15" y2="13" />
+          </svg>
+        </button>
+        {menuOpen && (
+          <div
+            className="absolute right-0 top-full mt-2 min-w-[160px] rounded border border-[#00d4ff]/20 bg-[#0a0f1a]/95 backdrop-blur-md shadow-lg py-1 z-50"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {(['built-by', 'contribute', 'whats-next'] as Panel[]).map((id) => (
+              <button
+                key={id}
+                onClick={() => { setMenuOpen(false); openPanel(id) }}
+                className="w-full text-left px-4 py-2.5 text-xs text-[#00d4ff] hover:bg-[#00d4ff]/10 transition-colors cursor-pointer"
+                style={{ fontFamily: 'var(--font-orbitron, Orbitron, sans-serif)', letterSpacing: '0.1em', textTransform: 'uppercase' }}
+              >
+                {LABELS[id]}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {open && typeof document !== 'undefined' && createPortal(
         <div
