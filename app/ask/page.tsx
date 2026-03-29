@@ -314,7 +314,7 @@ export default function AskPage() {
                 <div className="flex flex-col gap-1">
                   {SUGGESTIONS.map(s => (
                     <button key={s} onClick={() => sendMessage(s)}
-                      className="text-left text-xs transition-opacity py-0.5 w-fit text-[#00d4ff] opacity-45 hover:opacity-80">
+                      className="text-left text-xs transition-opacity py-0.5 w-fit text-[#00d4ff] opacity-[0.45] hover:opacity-80">
                       <span className="mr-2 text-[#00d4ff] opacity-30">$</span>{s}
                     </button>
                   ))}
