@@ -151,22 +151,25 @@ Two-phase scanner for secrets and PII accidentally stored in Notion.
 
 **Phase 1 — Regex Scan (always runs):**
 
-Scans all page content (including nested blocks, toggles, callouts) against 10+ patterns:
+Scans all page content (including nested blocks, toggles, callouts) against 13 patterns:
 
-| Pattern         | Example Match                             |
-| --------------- | ----------------------------------------- |
-| OpenAI Key      | `sk-proj-...`                             |
-| Anthropic Key   | `sk-ant-...`                              |
-| xAI Key         | `xai-...`                                 |
-| Stripe Key      | `sk_live_...`, `pk_test_...`              |
-| AWS Access Key  | `AKIA...`                                 |
-| GitHub Token    | `ghp_...`, `github_pat_...`               |
-| PEM Private Key | `-----BEGIN PRIVATE KEY-----`             |
-| JWT Token       | `xxx.xxx.xxx` (3-part base64)             |
-| Database URL    | `postgres://...`, `mongodb://...`         |
-| Credit Card     | Visa, Mastercard, Amex, Discover patterns |
+| Pattern              | Example Match                             |
+| -------------------- | ----------------------------------------- |
+| OpenAI Key           | `sk-proj-...`                             |
+| Anthropic Key        | `sk-ant-...`                              |
+| xAI / Grok Key       | `xai-...`                                 |
+| Stripe Secret Key    | `sk_live_...`, `sk_test_...`              |
+| Stripe Publishable   | `pk_live_...`, `pk_test_...`              |
+| AWS Access Key       | `AKIA...`                                 |
+| GitHub Token         | `ghp_...`, `gho_...`, `ghs_...`          |
+| GitHub PAT           | `github_pat_...`                          |
+| PEM Private Key      | `-----BEGIN PRIVATE KEY-----`             |
+| JWT Token            | `xxx.xxx.xxx` (3-part base64)             |
+| Database URL         | `postgres://...`, `mongodb://...`         |
+| Password in Code     | `password=...`, `secret:...`              |
+| Credit Card          | Visa, Mastercard, Amex, Discover patterns |
 
-All findings are **redacted** — only `[N chars redacted]` is shown, never the full value.
+All findings are **partially redacted** — values are shown as a snippet (first 8 characters + last 4, or first 4 for short matches), never the full value.
 
 **Phase 2 — AI Deep Scan (optional):**
 

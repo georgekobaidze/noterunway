@@ -14,10 +14,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'not_connected' }, { status: 401 })
   }
 
-  const staleDays = Math.max(
-    1,
-    parseInt(req.nextUrl.searchParams.get('staleDays') ?? '90', 10) || 90
-  )
+  const raw = parseInt(req.nextUrl.searchParams.get('staleDays') ?? '90', 10)
+  const staleDays = Math.max(1, isNaN(raw) ? 90 : raw)
 
   try {
     const notion = new NotionClient(token)

@@ -570,6 +570,7 @@ export class NotionClient {
     const archiveExcluded = pages.length - candidates.length
 
     const findings: SensitiveFinding[] = []
+    const findingKeys = new Set<string>()
 
     for (const page of candidates) {
       const pageTitle = titleOf(page)
@@ -595,13 +596,9 @@ export class NotionClient {
                 raw.length > 12
                   ? `${raw.slice(0, 8)}...${raw.slice(-4)}`
                   : `${raw.slice(0, 4)}...`
-              const alreadyAdded = findings.some(
-                (f) =>
-                  f.sourcePageId === page.id &&
-                  f.patternName === pattern.name &&
-                  f.redactedSnippet === redacted
-              )
-              if (!alreadyAdded) {
+              const key = `${page.id}:${pattern.name}:${redacted}`
+              if (!findingKeys.has(key)) {
+                findingKeys.add(key)
                 findings.push({
                   sourcePageId: page.id,
                   sourcePageTitle: pageTitle,
@@ -764,6 +761,7 @@ export class NotionClient {
 
     // Scan top-level blocks for @mention edges (fast, no recursion needed for graph)
     const mentionTargetCount = new Map<string, number>()
+    const edgeIds = new Set(edges.map((e) => e.id))
     const BATCH = 10
     for (let i = 0; i < candidates.length; i += BATCH) {
       const batch = candidates.slice(i, i + BATCH)
@@ -780,8 +778,8 @@ export class NotionClient {
                   const targetId = rt.mention.page?.id
                   if (!targetId || !candidateIds.has(targetId) || targetId === page.id) continue
                   const edgeId = `mention:${page.id}→${targetId}`
-                  const isNewEdge = !edges.some((e) => e.id === edgeId)
-                  if (isNewEdge) {
+                  if (!edgeIds.has(edgeId)) {
+                    edgeIds.add(edgeId)
                     edges.push({ id: edgeId, source: page.id, target: targetId, type: 'mention' })
                     mentionTargetCount.set(targetId, (mentionTargetCount.get(targetId) ?? 0) + 1)
                   }
